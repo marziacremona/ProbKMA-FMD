@@ -18,10 +18,10 @@ R functions for ProbKMA, cluster evaluation and functional motif discovery.
 
 
 ## Functional motif discovery example
-Example of functional motif discovery on simulated data: 20 curves embedding 2 functional motifs of length 60, each with 12 occurrences. 
+Functional motif discovery on simulated data: 20 curves embedding 2 functional motifs of length 60, each with 12 occurrences. 
 - `FMD_simulated_data.r`: script to run the example
-- `len200_sd0.1.RData`: simulated data
-- `len200_sd0.1_simulated_curves_with_motifs.pdf`: curves with true motifs
+- `len200_sd0.1.RData`: simulated curves
+- `len200_sd0.1_simulated_curves_with_motifs.pdf`: plot of curves with true motifs
 - `results`: functional motif discovery results
 
 ## Probabilistic local clustering examples
@@ -29,3 +29,5 @@ Example of functional motif discovery on simulated data: 20 curves embedding 2 f
 ### Berkley growth curves
 
 ### Italian Covid-19 excess mortality curves
+Probabilitic local clustering of Covid-19 excess mortality rate curves (daily difference between 2020 deaths and average deaths in the period 2015-2019) in the 20 regions of Italy. These curves were estimated in the period from February 16, 2020 and April 30, 2020 using the mortality data (due to all causes) from the Italian Institute of Statistics ISTAT. Raw mortality data are available on [ISTAT website](https://www.istat.it/it/files/2020/03/Dataset-decessi-comunali-giornalieri-e-tracciato-record-4giugno.zip).
+- `istat_mortality_rates_smoothed.Rdata`: smoothed excess mortality rate curves
