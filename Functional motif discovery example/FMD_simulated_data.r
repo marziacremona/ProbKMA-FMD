@@ -1,7 +1,3 @@
-#require(fda)
-#require(combinat)
-#require(Hmisc)
-
 # Set working directory to the folder of this script
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
