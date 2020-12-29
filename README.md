@@ -18,9 +18,11 @@ R functions for ProbKMA, cluster evaluation and functional motif discovery.
 
 
 ## Functional motif discovery example
-
-#### Simulated data
-
+Example of functional motif discovery on simulated data: 20 curves embedding 2 functional motifs of length 60, each with 12 occurrences. 
+- `FMD_simulated_data.r`: script to run the example
+- `len200_sd0.1.RData`: simulated data
+- `len200_sd0.1_simulated_curves_with_motifs.pdf`: curves with true motifs
+- `results`: functional motif discovery results
 
 ## Probabilistic local clustering examples
 
