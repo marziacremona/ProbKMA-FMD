@@ -29,6 +29,7 @@ Functional motif discovery on simulated data: 20 curves embedding 2 functional m
 ### Berkley growth curves
 Probabilitstic local clustering of the Berkley Growth Study dataset, provided within the R package `fda` and consisting of the heights of 39 boys and 54 girls recorded from age 1 to 18.
 - `growth_smoothed.RData`: smoothed growth curves
+- `growth_curves.pdf`: plot of growth curves and growth velocities
 - `probKMA_growth.r`: script to run the example
 
 ### Italian Covid-19 excess mortality curves
