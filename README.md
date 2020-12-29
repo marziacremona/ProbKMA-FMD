@@ -26,6 +26,6 @@ Example of functional motif discovery on simulated data: 20 curves embedding 2 f
 
 ## Probabilistic local clustering examples
 
-#### Berkley growth curves
+### Berkley growth curves
 
-#### Italian Covid-19 excess mortality curves
+### Italian Covid-19 excess mortality curves
