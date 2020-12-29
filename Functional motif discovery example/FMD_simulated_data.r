@@ -56,7 +56,7 @@ c = c(61, 51, 41) # minimum motif lengths to try
 n_init = 10 # number of random initializations to try
 
 ###
-# NOTE: rename "results" folder to re-run everything (TIME CONSUMING, TAKES ABOUT 30-50 MINUTES)!
+# NOTE: rename "results" folder to re-run everything (TIME CONSUMING, TAKES ABOUT 30 MINUTES ON 3 CORES)!
 ###
 
 files = list.files('./results')
