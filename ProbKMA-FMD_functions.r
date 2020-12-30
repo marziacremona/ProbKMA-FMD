@@ -377,7 +377,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     cl_probKMA=NULL
   }
   end=proc.time()
-  message('set parallel jobs: ',round((end-start)[3],2))
+  #message('set parallel jobs: ',round((end-start)[3],2))
   
   ### check input ####################################################################################
   start=proc.time()
@@ -647,7 +647,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
   if((!is.numeric(quantile4clean))||(length(quantile4clean)!=1)||(N*K*quantile4clean<K)||(quantile4clean>1))
     stop('quantile4clean not valid.')
   end=proc.time()
-  message('check input: ',round((end-start)[3],2))
+  #message('check input: ',round((end-start)[3],2))
   
   ### initialize #############################################################################################
   start=proc.time()
@@ -690,7 +690,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
              return(v)
            },d)
   end=proc.time()
-  message('initialize: ',round((end-start)[3],2))
+  #message('initialize: ',round((end-start)[3],2))
   
   ### iterate #############################################################################################
   iter=0
@@ -699,7 +699,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
   BC_dist=+Inf
   while((iter<iter_max)&(BC_dist>tol)){
     iter=iter+1
-    message('iter ',iter)
+    #message('iter ',iter)
     
     ##### clean motifs ###################################################################################
     start=proc.time()
@@ -715,7 +715,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
       P[!keep]=0
     }
     end=proc.time()
-    message('  clean: ',round((end-start)[3],2))
+    #message('  clean: ',round((end-start)[3],2))
     
     ##### compute motifs ###################################################################################
     start=proc.time()
@@ -731,7 +731,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     S_k=split(S,rep(seq_len(K),each=N))
     V_dom=lapply(V_new,.domain,use0)
     end=proc.time()
-    message('  compute motifs: ',round((end-start)[3],2))
+    #message('  compute motifs: ',round((end-start)[3],2))
     
     ##### elongate motifs #################################################################################
     start=proc.time()
@@ -816,7 +816,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
       S=matrix(unlist(S_k),ncol=K)
     }
     end=proc.time()
-    message('  elongate: ',round((end-start)[3],2))
+    #message('  elongate: ',round((end-start)[3],2))
     
     ##### find shift warping minimizing dissimilarities ###################################################
     start=proc.time()
@@ -829,7 +829,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     S_new=matrix(SD[1,],ncol=K)
     D_new=matrix(SD[2,],ncol=K)
     end=proc.time()
-    message('  find shift: ',round((end-start)[3],2))
+    #message('  find shift: ',round((end-start)[3],2))
     
     ##### compute memberships #############################################################################
     start=proc.time()
@@ -853,7 +853,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
       P_new[which.min(D_new[,k]),k]=1
     }
     end=proc.time()
-    message('  compute memberships: ',round((end-start)[3],2))
+    #message('  compute memberships: ',round((end-start)[3],2))
     
     ##### evaluate objective function #####################################################################
     J_iter[iter]=sum(D_new*(P_new^m),na.rm=TRUE)
@@ -948,7 +948,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     output=c(output,list(P0=P0,S0=S0))
   }
   end=proc.time()
-  message('output: ',round((end-start)[3],2))
+  #message('output: ',round((end-start)[3],2))
   
 
   ### return output ####################################################################################
