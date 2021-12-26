@@ -1,4 +1,4 @@
-# ProbKMA: Probabilistic k-mean with local alignment
+# ProbKMA: Probabilistic k-means with local alignment
 # ProbKMA-FMD: ProbKMA-based Functional Motif Discovery
 
 library(combinat)
@@ -311,7 +311,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
                        iter4elong=10,tol4elong=1e-3,max_elong=0.5,trials_elong=10,deltaJk_elong=0.05,max_gap=0.2,
                        iter4clean=50,tol4clean=1e-4,quantile4clean=1/K,
                        return_options=TRUE,return_init=TRUE,worker_number=NULL){
-  # Probabilistic k-mean with local alignment to find candidate motifs.
+  # Probabilistic k-means with local alignment to find candidate motifs.
   # Y0: list of N vectors, for univariate curves y_i(x), or
   #     list of N matrices with d columns, for d-dimensional curves y_i(x),
   #     with the evaluation of curves (all curves should be evaluated on a uniform grid).
