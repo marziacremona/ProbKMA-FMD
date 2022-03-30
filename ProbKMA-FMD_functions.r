@@ -1,4 +1,4 @@
-# ProbKMA: Probabilistic k-means with local alignment
+# ProbKMA: Probabilistic k-mean with local alignment
 # ProbKMA-FMD: ProbKMA-based Functional Motif Discovery
 
 library(combinat)
@@ -311,7 +311,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
                        iter4elong=10,tol4elong=1e-3,max_elong=0.5,trials_elong=10,deltaJk_elong=0.05,max_gap=0.2,
                        iter4clean=50,tol4clean=1e-4,quantile4clean=1/K,
                        return_options=TRUE,return_init=TRUE,worker_number=NULL){
-  # Probabilistic k-means with local alignment to find candidate motifs.
+  # Probabilistic k-mean with local alignment to find candidate motifs.
   # Y0: list of N vectors, for univariate curves y_i(x), or
   #     list of N matrices with d columns, for d-dimensional curves y_i(x),
   #     with the evaluation of curves (all curves should be evaluated on a uniform grid).
@@ -1857,6 +1857,8 @@ filter_candidate_motifs <- function(find_candidate_motifs_results,sil_threshold=
                           })
                  })
   motifs=unlist(unlist(motifs,recursive=FALSE),recursive=FALSE)
+  if(is.null(unlist(motifs)))
+    stop("No motif present after filtering. Please re-run the function with less stringent parameters.")
   V0_clean=unlist(lapply(motifs,function(motifs) motifs$V0_clean),recursive=FALSE)
   V_clean_length=unlist(lapply(V0_clean,length))
   index=order(V_clean_length,decreasing=TRUE) # order from the longest to the shortest
@@ -1869,7 +1871,7 @@ filter_candidate_motifs <- function(find_candidate_motifs_results,sil_threshold=
 
   ### output ##################################################################################################
   load(paste0(name,"_K",K[1],"_c",c[1],'/random',1,'.RData'))
-  return(list(V0_clean=V0_clean,V1_clean=V1_clean,D_clean=D_clean,P_clean=P_clean,c=c,K=K,
+  return(list(V0_clean=V0_clean,V1_clean=V1_clean,D_clean=as.matrix(D_clean),P_clean=as.matrix(P_clean),c=c,K=K,
               Y0=probKMA_results$Y0,Y1=probKMA_results$Y1,
               diss=probKMA_results$diss,alpha=probKMA_results$alpha,w=probKMA_results$w,max_gap=probKMA_results$max_gap))
 }
@@ -2037,18 +2039,23 @@ cluster_candidate_motifs <- function(filter_candidate_motifs_results,motif_overl
   
   
   ### compute distances between motifs ####################################################################
-  VV=combn(V,2,simplify=FALSE)
-  VV=array(unlist(VV,recursive=FALSE),dim=c(2,length(VV)))
-  VV_lengths=as.matrix(combn(V_length,2))
-  VV_motif_overlap=floor(apply(VV_lengths,2,min)*motif_overlap)
-  SD=mapply(.find_min_diss,VV[1,],VV[2,],VV_motif_overlap,
-            MoreArgs=list(alpha=alpha,w=w,d=d,use0=use0,use1=use1),SIMPLIFY=TRUE)
-  VV_D=matrix(0,nrow=length(V),ncol=length(V))
-  VV_D[lower.tri(VV_D)]=SD[2,]
-  VV_D=VV_D+t(VV_D) # matrix of distances
-  VV_S=matrix(0,nrow=length(V),ncol=length(V))
-  VV_S[lower.tri(VV_S)]=SD[1,]
-  VV_S=VV_S+t(VV_S)+diag(1,nrow=length(V)) # matrix of shifts
+  if(length(V)==1){
+    VV_D=as.matrix(0)
+    VV_S=as.matrix(1)
+  }else{
+    VV=combn(V,2,simplify=FALSE)
+    VV=array(unlist(VV,recursive=FALSE),dim=c(2,length(VV)))
+    VV_lengths=as.matrix(combn(V_length,2))
+    VV_motif_overlap=floor(apply(VV_lengths,2,min)*motif_overlap)
+    SD=mapply(.find_min_diss,VV[1,],VV[2,],VV_motif_overlap,
+              MoreArgs=list(alpha=alpha,w=w,d=d,use0=use0,use1=use1),SIMPLIFY=TRUE)
+    VV_D=matrix(0,nrow=length(V),ncol=length(V))
+    VV_D[lower.tri(VV_D)]=SD[2,]
+    VV_D=VV_D+t(VV_D) # matrix of distances
+    VV_S=matrix(0,nrow=length(V),ncol=length(V))
+    VV_S[lower.tri(VV_S)]=SD[1,]
+    VV_S=VV_S+t(VV_S)+diag(1,nrow=length(V)) # matrix of shifts
+  }
   
   ### determine a global radius Rall ######################################################################
   dataR=data.frame(P=as.vector(filter_candidate_motifs_results$P_clean),D=as.vector(filter_candidate_motifs_results$D_clean))
@@ -2061,7 +2068,11 @@ cluster_candidate_motifs <- function(filter_candidate_motifs_results,motif_overl
   }
   
   ### cluster motifs and determine a group-specific radius Rm ##############################################
-  VV_dist=as.dist(VV_D)
+  if(length(V)==1){
+    hclust_res=NULL
+    R_m=R_all
+  }else{
+    VV_dist=as.dist(VV_D)
   hclust_res=hclust(VV_dist,method='average') # hierarchical clustering based on motif-motif distances
   V_hclust=cutree(hclust_res,h=2*R_all) # cut at high 2*R_all
   n_hclust=max(V_hclust)
@@ -2081,6 +2092,7 @@ cluster_candidate_motifs <- function(filter_candidate_motifs_results,motif_overl
       pred_knn=knn(train=dataR$D,test=as.matrix(D_new),cl=dataR$P,k=k_knn,prob=TRUE)
       R_m[i_hclust]=D_new[which(ifelse(pred_knn==1,attributes(pred_knn)$prob,1-attributes(pred_knn)$prob)<=votes_knn_Rm)[1]]
     }
+  }
   }
   
   ### output ###############################################################################################
@@ -2154,16 +2166,22 @@ cluster_candidate_motifs_plot <- function(cluster_candidate_motifs_results,ylab=
   legend('topright',legend=c('Curves with motif','Curves without motif'),lwd=2,col=c('red','blue'))
   
   ### cut dendrogram and check group-specific radius Rm ##################################################
-  V_hclust=cutree(cluster_candidate_motifs_results$hclust_res,h=2*R_all) # cut at high 2*R_all
+  if(is.null(cluster_candidate_motifs_results$hclust_res)){
+    V_hclust=1
+  }else{
+    V_hclust=cutree(cluster_candidate_motifs_results$hclust_res,h=2*R_all) # cut at high 2*R_all
+  }
   n_hclust=max(V_hclust)
-  par(mfrow=c(1,1))
-  dendr=as.dendrogram(cluster_candidate_motifs_results$hclust_res,hang=1)
-  labels_cex(dendr)=0.8
-  plot(dendr,ylab='Distance motif-motif',main='Dendrogram of motifs')
-  abline(h=2*R_all,col='black',lwd=2)
-  text(x=1,y=2*R_all,labels=expression('2R'[all]),pos=3,offset=0.5)
-  if(n_hclust>1)
-    rect.dendrogram(dendr,k=n_hclust)
+  if(!is.null(cluster_candidate_motifs_results$hclust_res)){
+    par(mfrow=c(1,1))
+    dendr=as.dendrogram(cluster_candidate_motifs_results$hclust_res,hang=1)
+    labels_cex(dendr)=0.8
+    plot(dendr,ylab='Distance motif-motif',main='Dendrogram of motifs')
+    abline(h=2*R_all,col='black',lwd=2)
+    text(x=1,y=2*R_all,labels=expression('2R'[all]),pos=3,offset=0.5)
+    if(n_hclust>1)
+      rect.dendrogram(dendr,k=n_hclust)
+  }
   
   # re-compute or check group-specific radius Rm, and plot
   if(is.null(R_m))
@@ -2316,7 +2334,11 @@ motifs_search <- function(cluster_candidate_motifs_results,
   V_length=unlist(lapply(V_dom,length))
   
   ### cut dendrogram and check group-specific radius Rm ##################################################
-  V_hclust=cutree(cluster_candidate_motifs_results$hclust_res,h=2*R_all) # cut at high 2*R_all
+  if(is.null(cluster_candidate_motifs_results$hclust_res)){
+    V_hclust=1
+  }else{
+    V_hclust=cutree(cluster_candidate_motifs_results$hclust_res,h=2*R_all) # cut at high 2*R_all
+  }
   n_hclust=max(V_hclust)
   
   # re-compute or check group-specific radius Rm
