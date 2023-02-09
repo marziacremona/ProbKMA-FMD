@@ -1,6 +1,6 @@
 # ProbKMA-FMD
 
-R code implementing **ProbKMA** (probabilistic K-means with local alignment) for local clustering of functional data and functional motif discovery, proposed in the paper [Probabilistic K-mean with local alignment for clustering and motif discovery in functional data](https://arxiv.org/abs/1808.04773), by Marzia A. Cremona and Francesca Chiaromonte. 
+R code implementing **ProbKMA** (probabilistic K-means with local alignment) for local clustering of functional data and functional motif discovery, proposed in the paper [Probabilistic K-means with local alignment for clustering and motif discovery in functional data](https://doi.org/10.1080/10618600.2022.2156522), by Marzia A. Cremona and Francesca Chiaromonte. 
 
 
 ## Code
