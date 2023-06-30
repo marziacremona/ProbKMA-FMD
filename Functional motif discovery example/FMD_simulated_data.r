@@ -28,7 +28,8 @@ source("../ProbKMA-FMD_functions.r")
 
 load(paste0('len200_sd0.1.RData')) 
 
-
+# Y0: list of 20 vectors (univariate curves) with the evaluation of the 20 curves in 201 points
+# Y1: list of 20 vectors (univariate curves) with the evaluation of the 20 curve derivatives in 201 points
 
 
 #######################
@@ -60,6 +61,16 @@ if('len200_sd0.1_candidate.RData' %in% files){
   # candidate motifs already present, load them
   load('./results/len200_sd0.1_candidate.RData')
 }else{
+  # Y0: list of N vectors, for univariate curves y_i(x), or
+  #     list of N matrices with d columns, for d-dimensional curves y_i(x),
+  #     with the evaluation of curves (all curves should be evaluated on a uniform grid).
+  #     When y_j(x)=NA in the dimension j, then y_j(x)=NA in ALL dimensions
+  # Y1: list of N vectors, for univariate derivative curves y'_i(x), or
+  #     list of N matrices with d columns, for d-dimensional derivatibe curves y'_i(x),
+  #     with the evaluation of the curves derivatives (all curves should be evaluated on a uniform grid).
+  #     When y'_j(x)=NA in the dimension j, then y'_j(x)=NA in ALL dimensions.
+  #     Must be provided when diss='d1_L2' or diss='d0_d1_L2'.
+
   # find candidate motifs
   find_candidate_motifs_results = find_candidate_motifs(Y0, Y1, K, c, n_init,
                                                         name = './results/len200_sd0.1', names_var = 'x(t)',
