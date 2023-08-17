@@ -8,3 +8,5 @@ R/
 NAMESPACE
 
 Boost.Rproj
+
+.Rbuildignore
