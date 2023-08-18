@@ -10,3 +10,5 @@ NAMESPACE
 Boost.Rproj
 
 .Rbuildignore
+
+src/RcppExports.cpp
