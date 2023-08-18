@@ -1,0 +1,12 @@
+# Ignora i file di sistema Mac
+.DS_store
+
+Read-and-delete-me
+
+R/
+
+NAMESPACE
+
+Boost.Rproj
+
+.Rbuildignore
