@@ -8,3 +8,11 @@ R/
 NAMESPACE
 
 Boost.Rproj
+
+.Rbuildignore
+
+src/RcppExports.cp
+
+.Rdata
+.Rhistory
+.Rproj.user/
