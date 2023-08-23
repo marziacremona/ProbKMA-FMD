@@ -11,4 +11,13 @@ Boost.Rproj
 
 .Rbuildignore
 
-src/RcppExports.cpp
+src/RcppExports.cp
+
+.Rdata
+.Rhistory
+.Rproj.user/
+*.o
+*.so
+
+Makevars
+Makevars.win
