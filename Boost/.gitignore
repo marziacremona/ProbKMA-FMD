@@ -16,5 +16,8 @@ src/RcppExports.cp
 .Rdata
 .Rhistory
 .Rproj.user/
-*.0
+*.o
 *.so
+
+Makevars
+Makevars.win
