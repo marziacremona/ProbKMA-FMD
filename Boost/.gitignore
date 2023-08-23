@@ -16,3 +16,5 @@ src/RcppExports.cp
 .Rdata
 .Rhistory
 .Rproj.user/
+*.0
+*.so
