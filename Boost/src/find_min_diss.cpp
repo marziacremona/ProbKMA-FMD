@@ -119,11 +119,12 @@ NumericVector find_diss_template(const List &y,const List &v,
   if constexpr(use1) {
     temp_y1 = as<mat>(y[1]);
   }
+  auto index_range = std::views::iota(0,index_size);
   
-  for (unsigned int i = 0; i < s_rep_size; i++) {
+  for (unsigned int i = 0; i < s_rep_size; ++i) {
     IntegerVector index = s_rep[i] - 1 + seq_len(v_len);
     List y_rep_i = List::create(Named("y0") = R_NilValue, Named("y1") = R_NilValue);
-    auto j_true = std::views::iota(0,index_size) 
+    auto j_true = index_range
       | std::views::filter([&index,&y_len](int j){return((index[j] > 0) && (index[j] <= y_len));});
     if constexpr(use0) {
       mat new_y0(index_size, d);
@@ -152,7 +153,7 @@ NumericVector find_diss_template(const List &y,const List &v,
       temp_y = as<mat>(y_rep_i["y1"]);
     uvec non_na_indices = find_nan(temp_y.col(0)); 
     length_inter[i] = temp_y.col(0).n_elem - non_na_indices.n_elem;
-    i++;
+    ++i;
   }
   
   LogicalVector valid = length_inter >= c_k;
