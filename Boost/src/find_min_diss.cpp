@@ -93,11 +93,11 @@ NumericVector find_diss(const List &y,const List &v,
 }
 
 // more efficient version 
-// [[Rcpp::export]]
-NumericVector find_diss_efficient(const List &y,const List &v,  
+template<bool use0,bool use1>
+NumericVector find_diss_template(const List &y,const List &v,  
                                   const NumericVector & w, double alpha, unsigned int c_k,
-                                  unsigned int d, bool use0, 
-                                  bool use1, const Function & domain, 
+                                  unsigned int d, 
+                                  const Function & domain, 
                                   const Function & select_domain,
                                   const Function & diss_d0_d1_L2)
 {
@@ -111,27 +111,27 @@ NumericVector find_diss_efficient(const List &y,const List &v,
   List y_rep(s_rep_size);
   
   // Convert y[0] and y[1] to mat objects
+  const int index_size = v_len;
   mat temp_y0, temp_y1;
-  if (use0) {
+  if constexpr (use0) {
     temp_y0 = as<mat>(y[0]);
   }
-  if (use1) {
+  if constexpr(use1) {
     temp_y1 = as<mat>(y[1]);
   }
   
   for (unsigned int i = 0; i < s_rep_size; i++) {
     IntegerVector index = s_rep[i] - 1 + seq_len(v_len);
-    const int index_size = index.size();
     List y_rep_i = List::create(Named("y0") = R_NilValue, Named("y1") = R_NilValue);
     auto j_true = std::views::iota(0,index_size) 
       | std::views::filter([&index,&y_len](int j){return((index[j] > 0) && (index[j] <= y_len));});
-    if (use0) {
+    if constexpr(use0) {
       mat new_y0(index_size, d);
       new_y0.fill(datum::nan);
       std::for_each(j_true.begin(),j_true.end(),[&new_y0,&temp_y0,&index](int j){new_y0.row(j) = temp_y0.row(index[j] - 1);});
       y_rep_i["y0"] = new_y0;
     }
-    if (use1) {
+    if constexpr(use1) {
       mat new_y1(index_size, d);
       new_y1.fill(datum::nan);
       std::for_each(j_true.begin(),j_true.end(),[&new_y1,&temp_y1,&index](int j){new_y1.row(j) = temp_y1.row(index[j] - 1);});
@@ -143,16 +143,16 @@ NumericVector find_diss_efficient(const List &y,const List &v,
   const std::size_t y_rep_size = y_rep.size();
   IntegerVector length_inter(y_rep_size);
   
-  for (int i = 0; i < y_rep_size; i++) {
-    List temp_y_rep_i = as<List>(y_rep[i]);
-    mat temp_y;
-    if (use0) {
-      temp_y = as<mat>(temp_y_rep_i["y0"]);
-    } else {
-      temp_y = as<mat>(temp_y_rep_i["y1"]);
-    }
-    uvec non_na_indices = find_finite(temp_y.col(0));
-    length_inter[i] = non_na_indices.n_elem;
+  mat temp_y;
+  int i = 0;
+  for (const Rcpp::List& y_rep_i : y_rep) {
+    if constexpr(use0) 
+      temp_y = as<mat>(y_rep_i["y0"]);
+    else
+      temp_y = as<mat>(y_rep_i["y1"]);
+    uvec non_na_indices = find_nan(temp_y.col(0)); 
+    length_inter[i] = temp_y.col(0).n_elem - non_na_indices.n_elem;
+    i++;
   }
   
   LogicalVector valid = length_inter >= c_k;
@@ -165,12 +165,18 @@ NumericVector find_diss_efficient(const List &y,const List &v,
   
   NumericVector d_rep(y_rep_size);
   
-  for (int i = 0; i < y_rep_size; i++) {
-    double dist = as<double>(diss_d0_d1_L2(as<List>(y_rep[i]), v_new, w, alpha));
-    d_rep[i] = dist;
-  }
+  double min_d = std::numeric_limits<double>::max();
+  int min_s = 0;
   
-  return NumericVector::create(s_rep[which_min(d_rep)], min(d_rep)); 
+  for (int i = 0; i < y_rep_size; i++) {
+    double dist = as<double>(diss_d0_d1_L2(y_rep[i], v_new, w, alpha));
+    d_rep[i] = dist;
+    if (dist < min_d){
+      min_d = dist;
+      min_s = s_rep[i];
+    }
+  }
+  return NumericVector::create(min_s, min_d); 
 }
   
 IntegerVector myseq(int first, int last) {
@@ -184,3 +190,35 @@ IntegerVector myseq(int first, int last) {
     return y;
   }
 
+// [[Rcpp::export]]
+NumericVector find_diss_d0_d1(const List &y,const List &v,  
+                               const NumericVector & w, double alpha, unsigned int c_k,
+                               unsigned int d, 
+                               const Function & domain, 
+                               const Function & select_domain,
+                               const Function & diss_d0_d1_L2)
+{
+  return find_diss_template<TRUE,TRUE>(y,v,w,alpha,c_k,d,domain,select_domain,diss_d0_d1_L2);
+}
+
+// [[Rcpp::export]]
+NumericVector find_diss_d0(const List &y,const List &v,  
+                               const NumericVector & w, double alpha, unsigned int c_k,
+                               unsigned int d, 
+                               const Function & domain, 
+                               const Function & select_domain,
+                               const Function & diss_d0_d1_L2)
+{
+  return find_diss_template<TRUE,FALSE>(y,v,w,alpha,c_k,d,domain,select_domain,diss_d0_d1_L2);
+}
+
+// [[Rcpp::export]]
+NumericVector find_diss_d1(const List &y,const List &v,  
+                               const NumericVector & w, double alpha, unsigned int c_k,
+                               unsigned int d, 
+                               const Function & domain, 
+                               const Function & select_domain,
+                               const Function & diss_d0_d1_L2)
+{
+  return find_diss_template<FALSE,TRUE>(y,v,w,alpha,c_k,d,domain,select_domain,diss_d0_d1_L2);
+}
