@@ -7,8 +7,6 @@ library(class)
 library(dendextend)
 
 
-# Use mapply if paralization is not needed(cluster is not available)
-# Use clusterMap if paralization is needed
 .mapply_custom <- function(cl,FUN,...,MoreArgs=NULL,SIMPLIFY=TRUE,USE.NAMES=TRUE){
   if(is.null(cl)){
     mapply(FUN,...,MoreArgs=MoreArgs,SIMPLIFY=SIMPLIFY,USE.NAMES=USE.NAMES)
@@ -41,52 +39,45 @@ library(dendextend)
     return((1-alpha)*.diss_L2(y[[1]],v[[1]],w)+alpha*.diss_L2(y[[2]],v[[2]],w))
   }
 }
-.domain <- function(v,use0){# determine the domain (or support) of a curve or its derivative based on the boolean argument use0.
+.domain <- function(v,use0){
   if(use0){
-    #is.na returns a matrix whose elements are TRUE or FALSE wheter it is Na or not Na 
-    rowSums(!is.na(v[[1]]))!=0 
+    rowSums(!is.na(v[[1]]))!=0
   }else{
     rowSums(!is.na(v[[2]]))!=0
-  } # return true if there exists at least one element different from Na in the row.
+  }
 }
-# v[[1]] accesses to the center cluster(matrix)
-.select_domain <- function(v,v_dom,use0,use1){ # select the portion of the domain of the curve based on .domain
+.select_domain <- function(v,v_dom,use0,use1){
   if(use0)
     v[[1]]=as.matrix(v[[1]][v_dom,])
   if(use1)
     v[[2]]=as.matrix(v[[2]][v_dom,])
   return(v)
 }
- # the find_min_diss function performs a search for the best shift (warping) value between 
- # two multidimensional curves, y and v, by evaluating dissimilarity scores for different shifts. 
- # It then returns the shift that minimizes the dissimilarity and the corresponding dissimilarity value.
+
 .find_min_diss <- function(y,v,alpha,w,c_k,d,use0,use1){
+  # Find shift warping minimizing dissimilarity between multidimensional curves (dimension=d).
+  # Return shift and dissimilarity.
   # y: list of two elements y0=y(x), y1=y'(x), matrices with d columns.
   # v: list of two elements v0=v(x), v1=v'(x), matrices with d columns.
   # alpha: weight coefficient between d0.L2 and d1.L2.
   # w: weights for the dissimilarity index in the different dimensions (w>0).
   # c_k: minimum length of supp(y_shifted) and supp(v) intersection.
   
-  v_dom=.domain(v,use0) # domain of the v curve
-  v=.select_domain(v,v_dom,use0,use1) # select a portion of the curve
+  v_dom=.domain(v,use0)
+  v=.select_domain(v,v_dom,use0,use1)
   v_len=length(v_dom)
-  y_len=unlist(lapply(y,nrow))[1] # number of rows of the curve 
-  s_rep=(1-(v_len-c_k)):(y_len-v_len+1+(v_len-c_k)) #sequence of integers
-
-# The function is designed to create a list y_rep containing different subsets of the original y curve, 
-# each shifted based on the current shift index i.
-  y_rep=lapply(s_rep,  # the function apply function(i) for each element i in the sequence s_rep, y_rep è una lista fatta di y_rep_i
-               function(i){ 
-                 index=i-1+seq_len(v_len) #This line of code calculates the indices used to extract subsets of y based on the current shift index i
-                 y_rep_i=list(y0=NULL,y1=NULL)# initialization of an empty list 
+  y_len=unlist(lapply(y,nrow))[1]
+  s_rep=(1-(v_len-c_k)):(y_len-v_len+1+(v_len-c_k))
+  index = seq_len(v_len)
+  y_rep=lapply(s_rep,
+               function(i){
+                 index=i-1+seq_len(v_len)
+                 y_rep_i=list(y0=NULL,y1=NULL)
                  if(use0){
                    y_rep_i$y0=rbind(matrix(NA,nrow=sum(index<=0),ncol=d),
                                     as.matrix(y[[1]][index[(index>0)&(index<=y_len)],]),
                                     matrix(NA,nrow=sum(index>y_len),ncol=d))
-                 }# Construct a matrix y0 combaning three parts: a matrix of NA values with the same number
-                # of rows as the number of negative or zero values in index, a submatrix of the curve y[[1]]
-                # of the list y using positive and non-zero values from index, and another matrix of NA  
-                # values with the same number of rows as the number of positive values exceeding y_len in index. 
+                 }
                  if(use1){
                    y_rep_i$y1=rbind(matrix(NA,nrow=sum(index<=0),ncol=d),
                                     as.matrix(y[[2]][index[(index>0)&(index<=y_len)],]),
@@ -95,29 +86,28 @@ library(dendextend)
                  y_rep_i=.select_domain(y_rep_i,v_dom,use0,use1)
                  return(y_rep_i)
                })
-                
+  
   length_inter=unlist(lapply(y_rep,
                              function(y_rep_i){
                                if(use0)
                                  return(sum((!is.na(y_rep_i$y0[,1]))))
                                return(sum((!is.na(y_rep_i$y1[,1]))))
-                             }))#This line of code calculates the length of the intersection between the modified subsets of y (obtained from y_rep) and the v curve.
-  valid=length_inter>=c_k # This line of code generates a logical vector valid, where each element is TRUE if the length of the intersection between the modified subset of y and v is greater than or equal to c_k
-  if(sum(valid)==0){ # meaning there is no intersection of sufficient length
-    valid[length_inter==max(length_inter)]=TRUE # the code ensures that at least the subset with the longest intersection is marked as valid
+                             }))
+  valid=length_inter>=c_k
+  if(sum(valid)==0){
+    valid[length_inter==max(length_inter)]=TRUE
   }
-  s_rep=s_rep[valid] 
+  s_rep=s_rep[valid]
   y_rep=y_rep[valid]
-  # This line calculates the dissimilarity values for each element in y_rep using the function .diss_d0_d1_L2. 
-  # The function .diss_d0_d1_L2 takes as input y_rep, v, w, and alpha
-  d_rep=unlist(mapply(.diss_d0_d1_L2,y_rep,MoreArgs=list(v,w,alpha))) # mapply(FUN,... (the list for which we want to apply FUN multiple times), the other args of the FUN)
-  return(c(s_rep[which.min(d_rep)],min(d_rep)))# returns a vector with two elements: the shift value that minimizes the dissimilarity, and the minimum dissimilarity value.
+  d_rep=unlist(mapply(.diss_d0_d1_L2,y_rep,MoreArgs=list(v,w,alpha)))
+  return(c(s_rep[which.min(d_rep)],min(d_rep)))
 }
+
 
 .find_diss <- function(y,v,alpha,w,aligned,d,use0,use1){
   # Find dissimilarity between multidimensional curves (dimension=d), without alignment unless their lengths are different.
   # Return shift and dissimilarity.
-  # To be used by probKMA_silhouette function.
+  # To be used by probKMA_silhouette fucntion.
   # y: list of two elements y0=y(x), y1=y'(x), matrices with d columns.
   # v: list of two elements v0=v(x), v1=v'(x), matrices with d columns.
   # alpha: weight coefficient between d0.L2 and d1.L2.
@@ -155,14 +145,13 @@ library(dendextend)
 }
 
 
-.compute_motif <- function(v_dom,s_k,p_k,Y,m,use0,use1){ #compute the new center of the cluster, ha bisogno dei dati e delle probabilità di assegnazione e degli shift al passo precedente 
+.compute_motif <- function(v_dom,s_k,p_k,Y,m,use0,use1){
   # Compute the new motif v_new.
-  # v_dom: TRUE for x in supp(v). #vettore di bool = TRUE se e solo se la corrispondente riga sta nel supporto
+  # v_dom: TRUE for x in supp(v).
   # s_k: shift vector for motif k.
   # p_k: membership vector for motif k.
   # Y: list of N lists of two elements, Y0=y_i(x), Y1=y'_i(x), matrices with d columns, for d-dimensional curves.
-  # Y contiene tutte le curve del dataset, quindi lista di N curve d-dimensionali (N matrici)
-
+  
   .domain <- function(v,use0){
     if(use0){
       rowSums(!is.na(v[[1]]))!=0
@@ -172,24 +161,22 @@ library(dendextend)
   }
   .select_domain <- function(v,v_dom,use0,use1){
     if(use0)
-      v[[1]]=as.matrix(v[[1]][v_dom,]) #select the portion of the curve in the domain 
+      v[[1]]=as.matrix(v[[1]][v_dom,])
     if(use1)
       v[[2]]=as.matrix(v[[2]][v_dom,])
     return(v)
   }
-  # The function performs a weighted averaging of the elements in Y_inters_k to compute the new motif
   .compute_v_new <- function(Y_inters_k,Y_inters_supp,v_dom,v_len,p_k,d,m){
-    # Y_inters_k: modified subsets of curves 
     v_new=matrix(NA,nrow=v_len,ncol=d)
-    if(length(Y_inters_k)==1){ #there is only one modified subset of curves 
+    if(length(Y_inters_k)==1){
       v_new[v_dom,]=Y_inters_k[[1]]
       return(v_new)
     }
-    Y_inters_supp=Reduce(rbind,Y_inters_supp) #concatena le matrici che formano Y_inters_supp in una unica matrice Y_inters_supp
+    Y_inters_supp=Reduce(rbind,Y_inters_supp)
     coeff_k=p_k[p_k>0]^m/(rowSums(Y_inters_supp)) # NB: divide for the length of the interval, not for the squared length!
-    coeff_x=colSums(Y_inters_supp*coeff_k)#represents the weighted sum across the columns of Y_inters_supp
-    coeff_x[colSums(Y_inters_supp)==0]=NA #prevents division by zero in the subsequent calculation.
-    v_new[v_dom,]=Reduce('+',mapply('*',Y_inters_k,coeff_k,SIMPLIFY=FALSE))/coeff_x # For each element of Y_inters_k i multiply element-wise coefficienti_k and then i sum the result matrices
+    coeff_x=colSums(Y_inters_supp*coeff_k)
+    coeff_x[colSums(Y_inters_supp)==0]=NA
+    v_new[v_dom,]=Reduce('+',mapply('*',Y_inters_k,coeff_k,SIMPLIFY=FALSE))/coeff_x
     return(v_new)
   }
   
@@ -198,23 +185,22 @@ library(dendextend)
   }
   v_len=length(v_dom)
   d=unlist(lapply(Y[[1]],ncol))[1] # dimension of curves
-  # It applies a function using mapply to the elements of the Y list that have a membership 
-  # probability greater than zero (Y[p_k>0]).
-  Y_inters_k=mapply(function(y,s_k_i,d,use0,use1){# It processes each curve in the list, y, that has a nonzero membership probability to the cluster, k, and a corresponding shift value, s_k_i. It generates a modified subset of the curve based on the shift value
+  Y_inters_k=mapply(function(y,s_k_i,d,use0,use1){
                       y_len=unlist(lapply(y,nrow))[1]
                       y_inters_k=list(y0=NULL,y1=NULL)
-                      index=max(1,s_k_i)-1+seq_len(v_len-max(0,1-s_k_i)) # It calculates the indices used to extract the relevant part of the curve based on the shift value
-                      y_inters_k$y0=rbind(matrix(NA,nrow=max(0,1-s_k_i),ncol=d),
+                      index=max(1,s_k_i)-1+seq_len(v_len-max(0,1-s_k_i))
+                      if(use0)
+                        y_inters_k$y0=rbind(matrix(NA,nrow=max(0,1-s_k_i),ncol=d),
                                             matrix(y$y0[index[index<=y_len],],ncol=d),
-                                            matrix(NA,nrow=sum(index>y_len),ncol=d)) # shfted portion of the curve
+                                            matrix(NA,nrow=sum(index>y_len),ncol=d))
                       if(use1)
                         y_inters_k$y1=rbind(matrix(NA,nrow=max(0,1-s_k_i),ncol=d),
                                             matrix(y$y1[index[index<=y_len],],ncol=d),
                                             matrix(NA,nrow=sum(index>y_len),ncol=d))
-                      return(.select_domain(y_inters_k,v_dom,use0,use1))#remove any rows that are not part of the support, as indicated by the boolean vector v_dom
-                    },Y[p_k>0],s_k[p_k>0],MoreArgs=list(d,use0,use1),SIMPLIFY=FALSE)  
-  Y_inters_supp=lapply(Y_inters_k,.domain,use0) #For each shifted curve returns a vector of ones or zero, 1 iff the row does not contain NA(which elements of the curves belong to the support)
-  Y_inters_k=mapply(function(y_inters_k,y_inters_supp,use0,use1){#setting the non-support elements to zero.
+                      return(.select_domain(y_inters_k,v_dom,use0,use1))
+                    },Y[p_k>0],s_k[p_k>0],MoreArgs=list(d,use0,use1),SIMPLIFY=FALSE)
+  Y_inters_supp=lapply(Y_inters_k,.domain,use0)
+  Y_inters_k=mapply(function(y_inters_k,y_inters_supp,use0,use1){
                       if(use0)
                         y_inters_k$y0[!y_inters_supp]=0
                       if(use1)
@@ -296,7 +282,7 @@ library(dendextend)
   v_len=length(v_dom)
   v=.select_domain(v,v_dom,use0,use1)
   d=unlist(lapply(Y[[1]],ncol))[1]
-  Y_inters_k=mapply(function(y,s_k_i,d){ # generate the shifted subsets of curves Y_inters_k. For each curve y in Y, it computes the shifted version y_inters_k according to its shift s_k_i, creating a list of such shifted curves.
+  Y_inters_k=mapply(function(y,s_k_i,d){
                       y_len=unlist(lapply(y,nrow))[1]
                       y_inters_k=list(y0=NULL,y1=NULL)
                       index=max(1,s_k_i)-1+seq_len(v_len-max(0,1-s_k_i))
@@ -309,8 +295,8 @@ library(dendextend)
                                             matrix(y$y1[index[index<=y_len],],ncol=d),
                                             matrix(NA,nrow=sum(index>y_len),ncol=d))
                       return(.select_domain(y_inters_k,v_dom,use0,use1))
-                    },Y,s_k,MoreArgs=list(d),SIMPLIFY=FALSE) 
-  if(!is.null(keep_k)){# If any of the supports have a length less than c_k, the function returns NA
+                    },Y,s_k,MoreArgs=list(d),SIMPLIFY=FALSE)
+  if(!is.null(keep_k)){
     supp_inters_length=unlist(lapply(Y_inters_k[keep_k],function(y_inters_k) sum(.domain(y_inters_k,use0))))
     if(TRUE %in% (supp_inters_length<c_k))
       return(NA)
@@ -385,8 +371,8 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     worker_number <- core_number-1
   rm(core_number)
   if(worker_number>1){
-    cl_probKMA=makeCluster(worker_number,timeout=60*60*24*30)# creates a cluster of worker nodes to enable parallel processing. It end up at most in 30 days
-    clusterExport(cl_probKMA,c('.diss_d0_d1_L2','.domain','.select_domain'))# export functions in each node
+    cl_probKMA=makeCluster(worker_number,timeout=60*60*24*30)
+    clusterExport(cl_probKMA,c('.diss_d0_d1_L2','.domain','.select_domain'))
     on.exit(stopCluster(cl_probKMA))
   }else{
     cl_probKMA=NULL
@@ -421,15 +407,15 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
               function(y,d){
                 y[rowSums(!is.na(y))!=d,]=NA
                 return(y)},
-              d) # Set NA for dimensions that are not completely on the support 
+              d)
   }
   rm(Y0_NA)
   if(standardize){
-    Y0_tot=Reduce(rbind,Y0)# Stack all the matrices in Y0 row-wise
+    Y0_tot=Reduce(rbind,Y0)
     Y0_mean=colMeans(Y0_tot,na.rm=TRUE)
-    Y0_sd=apply(Y0_tot,2,sd,na.rm=TRUE)# applied sd to each column(margin=2)
+    Y0_sd=apply(Y0_tot,2,sd,na.rm=TRUE)
     rm(Y0_tot)
-    Y0=lapply(Y0,function(y0,m,s) t((t(y0)-m)/s*100),m=Y0_mean,s=Y0_sd) # values in percentage
+    Y0=lapply(Y0,function(y0,m,s) t((t(y0)-m)/s*100),m=Y0_mean,s=Y0_sd)
   }
   if(diss=='d0_d1_L2'){
     # check required input
@@ -480,7 +466,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     Y0_NA=lapply(Y0,function(y) rowSums(is.na(y))!=0)
     Y1_NA=lapply(Y1,function(y) rowSums(is.na(y))!=0)
     diff_NA=mapply(function(y0,y1) y0!=y1,Y0_NA,Y1_NA)
-    index_diff_NA=which(unlist(lapply(diff_NA,sum))!=0) # total number of differences between Y0 and Y1
+    index_diff_NA=which(unlist(lapply(diff_NA,sum))!=0)
     if(length(index_diff_NA)>0){
       warning('y_j(x) and y\'_j(x) are not both defined, for some x. Putting NA in that case.')
       same_NA=mapply(function(y0,y1,diff_NA){
@@ -530,21 +516,21 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
   # find all intervals contained in supp(y_i) and their lengths
   Y_intervals=lapply(Y0,
                      function(y,d){
-                       y_not_NA=(rowSums(!is.na(y))==d) # It checks if the number of non-NA values in each row is equal to d.
-                       intervals=which((y_not_NA[2:length(y_not_NA)]-y_not_NA[1:(length(y_not_NA)-1)])==1)+1 #It compute the intervals by finding the indices where the value changes from FALSE to TRUE and adds 1 to convert it into the right index.
+                       y_not_NA=(rowSums(!is.na(y))==d) # find supp(y)
+                       intervals=which((y_not_NA[2:length(y_not_NA)]-y_not_NA[1:(length(y_not_NA)-1)])==1)+1
                        if(y_not_NA[1])
-                         intervals=c(1,intervals)# If the first element of y_not_NA is TRUE, it means the first row of the data y contains non-NA values. In this case, we add 1 to the beginning of the intervals vector to account for the first interval
-                       intervals_lengths=rle(y_not_NA)$lengths[rle(y_not_NA)$values==TRUE]# lengths of the runs(interval) with TRUE values(consecutive) 
+                         intervals=c(1,intervals)
+                       intervals_lengths=rle(y_not_NA)$lengths[rle(y_not_NA)$values==TRUE]
                        intervals_all=data.frame(start=intervals,
                                                 end=intervals+intervals_lengths-1,
                                                 length=intervals_lengths)
                        return(intervals_all)
-                     },d) #These intervals represent consecutive regions in each element of Y0 have exactly d non-NA values.
+                     },d)
   # check minimum motif length compatibility
   min_length=unlist(lapply(Y_intervals,
                            function(y_intervals,c){
                              return(sum(y_intervals$length>=c))},
-                           max(c)))#this part calculates the number of intervals (motifs) whose length is greater than or equal to the specified motif length c
+                           max(c)))
   if(0 %in% min_length)
     stop('Minimum motifs length is incompatible with supplied curves. Choose a smaller minimum motifs length.')
   # check c_max
@@ -599,14 +585,14 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
       warning('Shift warping matrix dimensions not valid. Choosing random initial shift warping matrix.')
       S0=NULL
     }else{
-      Y_segments=mapply(function(y,S_i,c){# The outer lapply returns S_i for each i from 1...N. Then ot checks if there exists any NA values starting from the shifted curve y[s]
+      Y_segments=mapply(function(y,S_i,c){
                           return(mapply(function(s,c) NA %in% y[s+seq_len(c)-1],S_i,c))},
                         Y0,lapply(seq_len(N),function(i) S0[i,]),MoreArgs=list(c),SIMPLIFY=TRUE)
       if(sum(Y_segments)){
         warning('Shift warping matrix not valid. Choosing random initial shift warping matrix.')
         S0=NULL
       }
-    }#check whether there are any NA values in the segments of the curves corresponding to the centroid shifts in the S0 matrix.
+    }
   }
   # check weigths
   if(!is.vector(w)|!is.numeric(w))
@@ -667,27 +653,26 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
   ### initialize #############################################################################################
   start=proc.time()
   if(is.null(P0)){
-    # create random membership matrix, with N rows and K columns
-    P0=matrix(c(runif(N*(K-1)),rep(1,N)),nrow=N,ncol=K)#The first K-1 columns of P0 are filled with random values between 0 and 1.The last column of P0 is set to 1 for all rows --> each curve is assigned to at least one cluster or motif.
-  
-    P0=as.matrix(apply(P0,1,sort))# For each row i choose first the lower element and i compute the first Row of P0. then i go on with the second lower value for each row --> P0 becomes a KxN matrix( the last row is full of ones) --> a sort of comulative function for each column.
+    # create random membership matrix, with N rows and k columns
+    P0=matrix(c(runif(N*(K-1)),rep(1,N)),nrow=N,ncol=K)
+    P0=as.matrix(apply(P0,1,sort))
     if(K>1)
-      P0=cbind(P0[1,],Reduce('cbind',lapply(2:K,function(k) P0[k,]-P0[k-1,]))) #I compute "atom" probability through differences in consecutiv4 rows and stacking it column-wise.Each row sums one and each column sums > 0
+      P0=cbind(P0[1,],Reduce('cbind',lapply(2:K,function(k) P0[k,]-P0[k-1,])))
   }
   colnames(P0)=NULL
   P=P0
   if(is.null(S0)){
     # create shift warping matrix, with N rows and k columns
-    S0=matrix(unlist(lapply(Y_intervals, # list of data-frame 
+    S0=matrix(unlist(lapply(Y_intervals,
                             function(y_intervals,c,K){
                               s0=rep(NA,K)
                               for(k in 1:K){
-                                y_intervals_k=y_intervals[y_intervals$length>=c[k],]# filtering intevals greater or equal to c[k]
+                                y_intervals_k=y_intervals[y_intervals$length>=c[k],]
                                 y_starts=unlist(apply(y_intervals_k,1,
                                                       function(y_interval)
-                                                        return(y_interval[1]:(y_interval[2]-c[k]+1))),# return start_index:(end-c[k]+1)
+                                                        return(y_interval[1]:(y_interval[2]-c[k]+1))),
                                                 use.names=FALSE)
-                                s0[k]=sample(y_starts,1) #randomly selects one of these valid starting positions for each motif.
+                                s0[k]=sample(y_starts,1)
                               }
                               return(s0)
                             },c,K)),
@@ -721,11 +706,11 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     start=proc.time()
     P_old=P
     if((iter>1)&&(!(iter%%iter4clean))&&(BC_dist<tol4clean)){
-      keep=D<quantile(D,quantile4clean) #logical matrix.If a motif's dissimilarity values are below the specified quantile, it is considered significant or relevant and retained(N x K matrix)
-      empty_k=which(colSums(keep)==0) #these are motifs that are not considered significant or relevant based on the dissimilarity values
-      if(length(empty_k)>0){ # If there exist such a motif completely not significant 
+      keep=D<quantile(D,quantile4clean)
+      empty_k=which(colSums(keep)==0)
+      if(length(empty_k)>0){
         for(k in empty_k)
-          keep[which.min(D[,k]),k]=TRUE #If a motif is not enterly significant for any curves i set TRUE for the curves with minimum dissimilarity ensuring that it's not entirely discarded.
+          keep[which.min(D[,k]),k]=TRUE
       }
       P[keep]=1
       P[!keep]=0
@@ -735,14 +720,14 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     
     ##### compute motifs ###################################################################################
     start=proc.time()
-    S_k=split(S,rep(seq_len(K),each=N))# S is split into a list of matrices S_k, where each element of the list corresponds to one cluster K (group) of curves
+    S_k=split(S,rep(seq_len(K),each=N))
     P_k=split(P,rep(seq_len(K),each=N))
     V_dom=lapply(V,.domain,use0)
-    V_new=mapply(.compute_motif,V_dom,S_k,P_k,MoreArgs=list(Y,m,use0,use1),SIMPLIFY=FALSE) # list with computed motif for each cluster of curves 
-    changed_s=which(unlist(lapply(V_new,length))>2) #This line identifies the clusters (groups) of curves where the computed motifs have more than two elements
+    V_new=mapply(.compute_motif,V_dom,S_k,P_k,MoreArgs=list(Y,m,use0,use1),SIMPLIFY=FALSE)
+    changed_s=which(unlist(lapply(V_new,length))>2)
     for(k in changed_s){
-      S[,k]=S[,k]+V_new[[k]]$shift # Update S for the k-th cluster by adding the shift values computed for the motif in the V_new list.
-      V_new[[k]]=V_new[[k]][c('v0','v1')]#This step updates the V_new list for the k-th cluster by keeping only the relevant information for the computed motif (it retains the elements named 'v0' and 'v1')
+      S[,k]=S[,k]+V_new[[k]]$shift
+      V_new[[k]]=V_new[[k]][c('v0','v1')]
     }
     S_k=split(S,rep(seq_len(K),each=N))
     V_dom=lapply(V_new,.domain,use0)
@@ -753,69 +738,69 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     start=proc.time()
     if((iter>1)&&(!(iter%%iter4elong))&&(BC_dist<tol4elong)){
       # fill
-      with_gaps=which(unlist(lapply(V_dom,function(v_dom) sum(!v_dom)!=0)))#identifies the indices of clusters of curves that are out of the domain
+      with_gaps=which(unlist(lapply(V_dom,function(v_dom) sum(!v_dom)!=0)))
       if(length(with_gaps)>0){
-        V_dom_filled=lapply(V_dom[with_gaps],function(v_dom) rep_len(TRUE,length(v_dom)))# For clusters with gaps, this line creates a new V_dom_filled list where the gaps are filled with TRUE
-        V_filled=mapply(.compute_motif,V_dom_filled,S_k[with_gaps],P_k[with_gaps],MoreArgs=list(Y,m,use0,use1),SIMPLIFY=FALSE)#calculate the motif based on the filled data
+        V_dom_filled=lapply(V_dom[with_gaps],function(v_dom) rep_len(TRUE,length(v_dom)))
+        V_filled=mapply(.compute_motif,V_dom_filled,S_k[with_gaps],P_k[with_gaps],MoreArgs=list(Y,m,use0,use1),SIMPLIFY=FALSE)
         Jk_before=mapply(.compute_Jk,
                          V_new[with_gaps],S_k[with_gaps],P_k[with_gaps],
-                         MoreArgs=list(Y=Y,alpha=alpha,w=w,m=m,use0=use0,use1=use1))# compute the metric J for cluster k with gaps
+                         MoreArgs=list(Y=Y,alpha=alpha,w=w,m=m,use0=use0,use1=use1))
         Jk_after=mapply(.compute_Jk,
                         V_filled,S_k[with_gaps],P_k[with_gaps],
-                        MoreArgs=list(Y=Y,alpha=alpha,w=w,m=m,use0=use0,use1=use1))#The Jk values after elongation (using filled data) are computed for the clusters with gaps
-        fill=(Jk_after-Jk_before)/Jk_before<deltaJk_elong #The fill logical vector is created to identify clusters where the relative change in Jk values after elongation is less than a specified threshold deltaJk_elong
+                        MoreArgs=list(Y=Y,alpha=alpha,w=w,m=m,use0=use0,use1=use1))
+        fill=(Jk_after-Jk_before)/Jk_before<deltaJk_elong
         V_dom[with_gaps[fill]]=V_dom_filled[fill]
         V_new[with_gaps[fill]]=V_filled[fill]
       }
       # elongate
-      len_dom=unlist(lapply(V_dom,length))# vector of lenghts (for each motif)
-      len_max_elong=mapply(min,floor(len_dom*max_elong),(c_max-len_dom))# taking the minimum value between...
-      len_elong=lapply(len_max_elong, # return a list where for each cluster, all the potential lengths for elongation are computed
+      len_dom=unlist(lapply(V_dom,length))
+      len_max_elong=mapply(min,floor(len_dom*max_elong),(c_max-len_dom))
+      len_elong=lapply(len_max_elong,
                        function(len_max_elong){
                          if(len_max_elong<=trials_elong){
-                           len_elong=seq_len(len_max_elong)#sequence of lengths ranging from 1 to len_max_elong
+                           len_elong=seq_len(len_max_elong)
                          }else{
-                           len_elong=round(seq(1,len_max_elong,length.out=trials_elong))#sequence of approximately trials_elong equally spaced values between 1 and len_max_elong
+                           len_elong=round(seq(1,len_max_elong,length.out=trials_elong))
                          }
                          return(len_elong)
                        })
       # left and right elongation
-      keep=D<quantile(D,0.25)# The variable keep is assigned a logical matrix where the elements are TRUE if the corresponding element in the dissimilarity matrix D is less than the 25th percentile of D.
-      empty_k=which(colSums(keep)==0)#Indices of clusters that have all dissimilarity values above the 25th percentile are identified.
+      keep=D<quantile(D,0.25)
+      empty_k=which(colSums(keep)==0)
       if(length(empty_k)>0){
         for(k in empty_k)
-          keep[which.min(D[,k]),k]=TRUE # ensure that all clusters have at least one motif that is considered significant 
+          keep[which.min(D[,k]),k]=TRUE
       }
       res_left_right=mapply(function(v_new_k,v_dom_k,s_k,p_k,len_elong_k,keep_k,c){
-                              if(length(len_elong_k)==0){ # If there are no valid elongation lengths for the cluster, it returns the original motif and domain vectors
+                              if(length(len_elong_k)==0){
                                 return(list(v_new=v_new_k,
                                             v_dom=v_dom_k,
                                             s_k=s_k))
                               }
-                              #create a matrix s_k_elong_left_right that contains different shifted warping matrices obtained by applying different elongation lengths to the original s_k matrix.
-                              s_k_elong_left_right=rep(lapply(c(0,len_elong_k),function(len_elong_k) s_k-len_elong_k),(length(len_elong_k)+1):1)[-1]#for each element in the list the provided function subtracts it from s_k, resulting in a shifted version of s_k(matrix).At the end we have a vector of lists of shifted warping matrices.(-1 removes the null case with no elongation)
-                                                                   function(len_elong_k_left) # modify previous matrices.It addresses the case where one side (left or right) has more potential for elongation than the other side.
+                              s_k_elong_left_right=rep(lapply(c(0,len_elong_k),function(len_elong_k) s_k-len_elong_k),(length(len_elong_k)+1):1)[-1]
+                              v_dom_elong_left_right=unlist(lapply(c(0,len_elong_k),
+                                                                   function(len_elong_k_left)
                                                                      lapply(c(0,len_elong_k[len_elong_k<=(max(len_elong_k)-len_elong_k_left)]),
                                                                             function(len_elong_k_right) 
                                                                               c(rep_len(TRUE,len_elong_k_left),v_dom_k,rep_len(TRUE,len_elong_k_right)))),
-                                                            recursive=FALSE)[-1] # non ho ben capito 
+                                                            recursive=FALSE)[-1]
                               v_elong_left_right=mapply(.compute_motif,v_dom_elong_left_right,s_k_elong_left_right,
-                                                        MoreArgs=list(p_k,Y,m,use0,use1),SIMPLIFY=FALSE)# compute new motif(return a list)
-                              start_with_NA=unlist(lapply(v_elong_left_right,length))>2#This line creates a logical vector indicating which elongated motifs have more than two elements
+                                                        MoreArgs=list(p_k,Y,m,use0,use1),SIMPLIFY=FALSE)
+                              start_with_NA=unlist(lapply(v_elong_left_right,length))>2
                               v_elong_left_right=v_elong_left_right[!start_with_NA]
                               s_k_elong_left_right=s_k_elong_left_right[!start_with_NA]
                               Jk_before=.compute_Jk(v_new_k,s_k,p_k,Y,alpha,w,m,use0=use0,use1=use1)
-                              c_k_after=floor(unlist(lapply(lapply(v_elong_left_right,.domain,use0),length))*(1-max_gap))#This line calculates a new potential motif length c_k_after for each elongated motif after applying a floor function and reducing it by a factor of max_gap
+                              c_k_after=floor(unlist(lapply(lapply(v_elong_left_right,.domain,use0),length))*(1-max_gap))
                               c_k_after[c_k_after<c]=c
                               Jk_after=unlist(mapply(.compute_Jk,v_elong_left_right,s_k_elong_left_right,c_k_after,
-                                                     MoreArgs=list(p_k=p_k,Y=Y,alpha=alpha,w=w,m=m,keep_k=keep_k,use0=use0,use1=use1)))#This line calculates the Jk metric for each elongated motif after applying the changes in c_k_after
-                              best_elong=which.min((Jk_after-Jk_before)/Jk_before)#This line identifies the index of the motif with the smallest relative change in the Jk metric after elongation.
-                              if(length(best_elong)>0){#If there is a potential elongation that improves the Jk metric
+                                                     MoreArgs=list(p_k=p_k,Y=Y,alpha=alpha,w=w,m=m,keep_k=keep_k,use0=use0,use1=use1)))
+                              best_elong=which.min((Jk_after-Jk_before)/Jk_before)
+                              if(length(best_elong)>0){
                                 elongate=((Jk_after-Jk_before)/Jk_before)[best_elong]<deltaJk_elong
                               }else{
                                 elongate=FALSE
                               }
-                              if(elongate){#If elongate is TRUE, the code returns the elongated motif, domain vector, and shifted warping matrix
+                              if(elongate){
                                 return(list(v_new=v_elong_left_right[[best_elong]],
                                             v_dom=v_dom_elong_left_right[[best_elong]],
                                             s_k=s_k_elong_left_right[[best_elong]]))
@@ -836,34 +821,37 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     
     ##### find shift warping minimizing dissimilarities ###################################################
     start=proc.time()
-    c_k=floor(unlist(lapply(V_new,function(v_new) unlist(lapply(v_new,nrow))[1]))*(1-max_gap))#For each cluster, this line calculates the desired motif length (c_k) based on the first motif in the V_new list
+    c_k=floor(unlist(lapply(V_new,function(v_new) unlist(lapply(v_new,nrow))[1]))*(1-max_gap))
     c_k[c_k<c]=c
     c_k=rep(c_k,each=length(Y))
-    YV=expand.grid(Y,V_new)#This line creates a data frame YV that contains all combinations of the original curves Y and the motifs in V_new
+    YV=expand.grid(Y,V_new)
     SD=.mapply_custom(cl_probKMA,.find_min_diss,YV[,1],YV[,2],c_k,
-                      MoreArgs=list(alpha=alpha,w=w,d=d,use0=use0,use1=use1),SIMPLIFY=TRUE)#find the shift warpings that minimize dissimilarities.The function .find_min_diss is applied to each combination of curve Y and motif in V_new (contained in YV), aiming to determine the optimal shift warping that minimizes dissimilarities.
-    S_new=matrix(SD[1,],ncol=K) #each column corresponds to a cluster (motif).The shift warpings and dissimilarities obtained from the optimization process are stored in these matrices.
+                      MoreArgs=list(alpha=alpha,w=w,d=d,use0=use0,use1=use1),SIMPLIFY=TRUE)
+    S_new=matrix(SD[1,],ncol=K)
     D_new=matrix(SD[2,],ncol=K)
     end=proc.time()
     #message('  find shift: ',round((end-start)[3],2))
     
     ##### compute memberships #############################################################################
     start=proc.time()
-    P_new=matrix(0,nrow=N,ncol=K) #Initializes a membership matrix P_new with dimensions N (number of curves) by K (number of motifs).
-    D0=apply(D_new,2,'%in%',0) #if dist(y_i,v_k)=0 for some k, set p(i,k)=1 and p(i,h)=0 for h!=k
-    for(i in which(rowSums(D0)>1)){ #This loop handles the case where a curve has a dissimilarity of 0 from two or more motifs. It randomly selects one of the motifs with dissimilarity 0 and sets the membership to 1 for that motif while setting membership to 0 for others
+    # create membership matrix, with N rows and k columns
+    P_new=matrix(0,nrow=N,ncol=K)
+    # if dist(y_i,v_k)=0 for some k, set p(i,k)=1 and p(i,h)=0 for h!=k
+    D0=apply(D_new,2,'%in%',0)
+    for(i in which(rowSums(D0)>1)){
       warning(paste0('Curve ',i,' has dissimilarity 0 from two different motifs. Using only one of them...'))
       D0_select=sample(which(D0[i,]),1)
       D0[i,-D0_select]=FALSE
     }
-    D0_index=rowSums(D0)==1 # identifies curves with dissimilarities exactly equal to 0 from a single motif
+    D0_index=rowSums(D0)==1
     P_new[D0_index,]=1*D0[D0_index,]
     # if dist(y_i,v_k)>0 for all k
     Dm=as.matrix(D_new[!D0_index,]^(1/(m-1)))
     P_new[!D0_index,]=1/(Dm*rowSums(1/Dm))
-    for(k in which(colSums(P_new)==0)){# check degenerate clusters (zero membership)
+    # check degenerate clusters (zero membership)
+    for(k in which(colSums(P_new)==0)){
       warning(paste0('Motif ',k,' is degenerate (zero membership). Selecting a new center...'))
-      P_new[which.min(D_new[,k]),k]=1 # set the membership of the curve with the minimum dissimilarity to that motif to 1
+      P_new[which.min(D_new[,k]),k]=1
     }
     end=proc.time()
     #message('  compute memberships: ',round((end-start)[3],2))
@@ -878,8 +866,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     if(stop_criterion=='mean')
       BC_dist=mean(BC_dist_k)
     if(stop_criterion=='quantile')
-      BC_dist=quantile(BC_dist_k,prob,type=1)#type = 1: Linear interpolation method. The quantile value is computed as a linear interpolation between the two nearest data points
-    
+      BC_dist=quantile(BC_dist_k,prob,type=1)
     BC_dist_iter[iter]=BC_dist    
 
     ##### update ##########################################################################################
@@ -895,7 +882,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     warning('maximum number of iterations reached, method stops')
   }
   # compute motifs
-  S_k=split(S,rep(seq_len(K),each=N)) #  shifts and memberships matrices for each cluster(Nx1 matrix)
+  S_k=split(S,rep(seq_len(K),each=N))
   P_k=split(P,rep(seq_len(K),each=N))
   if(!use0){
     use0=TRUE
@@ -903,7 +890,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
   }
   V=mapply(.compute_motif,V_dom,S_k,P_k,MoreArgs=list(Y,m,use0,use1),SIMPLIFY=FALSE)
   # compute cleaned motifs
-  keep=D<quantile(D,quantile4clean) #matrix keep, which is TRUE where the dissimilarity values in D are below the specified quantile (quantile4clean).
+  keep=D<quantile(D,quantile4clean)
   empty_k=which(colSums(keep)==0)
   if(length(empty_k)>0){
     for(k in empty_k)
@@ -915,16 +902,16 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
   P_k=split(P_clean,rep(seq_len(K),each=N))
   S_clean=S
   V_clean=mapply(.compute_motif,V_dom,S_k,P_k,MoreArgs=list(Y,m,use0,use1),SIMPLIFY=FALSE)
-  changed_s=which(unlist(lapply(V_clean,length))>2) #Identify clusters (changed_s) where the computed cleaned motifs have more than two elements(well computed).
+  changed_s=which(unlist(lapply(V_clean,length))>2)
   for(k in changed_s){
     S_clean[,k]=S_clean[,k]+V_clean[[k]]$shift
-    V_clean[[k]]=V_clean[[k]][c('v0','v1')]# retains only v0 and v1
+    V_clean[[k]]=V_clean[[k]][c('v0','v1')]
   }
   S_k=split(S_clean,rep(seq_len(K),each=N))
   V_dom=lapply(V_clean,.domain,use0)
   # compute dissimilarities from cleaned motifs
   D_clean=mapply(function(s_k,v_dom,v_clean,Y){
-                   Y_in_motifs=mapply(function(y,s){#For each combination of s_k, v_dom, and v_clean, the inner mapply function calculates Y_in_motifs by shifting the original data Y according to s_k and adjusting the domain based on v_dom.
+                   Y_in_motifs=mapply(function(y,s){
                                         if(use0){
                                           d=ncol(y$y0) # dimension of curves
                                           y_len=nrow(y$y0)
@@ -1225,6 +1212,7 @@ probKMA_plot <- function(probKMA_results,ylab='',cleaned=FALSE){
   return()
 }
 
+
 probKMA_silhouette <- function(probKMA_results,align=FALSE,plot=TRUE){
   # Compute the adapted silhouette index on the results of probKMA.
   # probKMA_results: output of probKMA function (with return_options=TRUE).
@@ -1258,15 +1246,14 @@ probKMA_silhouette <- function(probKMA_results,align=FALSE,plot=TRUE){
   V_length=unlist(lapply(V_dom,length))
   
   # extract pieces of curves that fall in the different motifs
-  curves_in_motifs=apply(probKMA_results$P_clean,2,function(P_clean_k) which(P_clean_k==1))# for each column(motif P_clean_k) the function which(P_clean_k == 1) returns a list where for each column we have indices of curves assigned to that motif.
-  if(!is.null(ncol(curves_in_motifs))){ #If there are curves assigned to the motifs
-    curves_in_motifs=split(curves_in_motifs,rep(seq_len(ncol(curves_in_motifs)),each=nrow(curves_in_motifs)))#the curves_in_motifs variable is split into a list where each element of the list corresponds to a motif (column) and contains the indices of curves assigned to that motif.
+  curves_in_motifs=apply(probKMA_results$P_clean,2,function(P_clean_k) which(P_clean_k==1))
+  if(!is.null(ncol(curves_in_motifs))){
+    curves_in_motifs=split(curves_in_motifs,rep(seq_len(ncol(curves_in_motifs)),each=nrow(curves_in_motifs)))
   }
-  curves_in_motifs_number=colSums(probKMA_results$P_clean) #The curves_in_motifs_number vector stores the count of curves assigned to each motif.
+  curves_in_motifs_number=colSums(probKMA_results$P_clean)
   S_clean_k=mapply(function(s_k,curves_in_motif) s_k[curves_in_motif],
-                            split(probKMA_results$S_clean,rep(seq_len(K),each=N)),curves_in_motifs,SIMPLIFY=FALSE)# This function takes the shift warping matrix s_k and extracts only the rows corresponding to curves assigned to the motif using the indices from curves_in_motif
-                                                                                                                  # The result is stored in the S_clean_k list, where each element corresponds to a motif and contains the shift warping matrices for the curves assigned to that motif
-                                                                                                                  # The number of rows in the shift warping matrix will be equal to the number of curves assigned to that motif, and the number of columns will be determined by the length of the shift warping vectors
+                            split(probKMA_results$S_clean,rep(seq_len(K),each=N)),curves_in_motifs,SIMPLIFY=FALSE)
+  
   # compute distances between pieces of curves
   Y_in_motifs=unlist(mapply(function(curves_in_motif,s_k,v_dom){
                               Y_in_motif=mapply(function(y,s){
@@ -1290,14 +1277,13 @@ probKMA_silhouette <- function(probKMA_results,align=FALSE,plot=TRUE){
                                                   }
                                                   return(y)
                                                 },Y[curves_in_motif],s_k,SIMPLIFY=FALSE)
-                            },curves_in_motifs,S_clean_k,V_dom,SIMPLIFY=FALSE),recursive=FALSE)#The result is a matrix-like object Y_in_motifs that represents the curves after applying the shift warping transformations and domain adjustments
-  Y_motifs=rep.int(1:K,curves_in_motifs_number)#Y_motifs associates each curve with its corresponding motif index.
-  YY=combn(Y_in_motifs,2,simplify=FALSE) #It generates a list of matrices where each column represents a pair of motifs
-  YY=array(unlist(YY,recursive=FALSE),dim=c(2,length(YY)))#: This line converts the list of matrices YY into a two-dimensional array. Each column of the array corresponds to a pair of motifs.
-  YY_lengths=combn(V_length[Y_motifs],2) #This line computes all possible combinations of pairs of elements from the V_length vector, considering only the motifs associated with each curve.
-                                         #The first row of the matrix contains the lengths of the motifs for the first motif in each pair, and the second row contains the lengths of the motifs for the second motif in each pair.
+                            },curves_in_motifs,S_clean_k,V_dom,SIMPLIFY=FALSE),recursive=FALSE)
+  Y_motifs=rep.int(1:K,curves_in_motifs_number)
+  YY=combn(Y_in_motifs,2,simplify=FALSE)
+  YY=array(unlist(YY,recursive=FALSE),dim=c(2,length(YY)))
+  YY_lengths=combn(V_length[Y_motifs],2)
   swap=YY_lengths[1,]<YY_lengths[2,]
-  YY[,swap]=rbind(YY[2,swap],YY[1,swap])#This line swaps the columns of the YY array based on the condition in the swap vector.
+  YY[,swap]=rbind(YY[2,swap],YY[1,swap])
   if(align){
     # find distance between the two pieces of curves
     # no alignment for pieces corresponding to motifs with the same length
@@ -1308,21 +1294,18 @@ probKMA_silhouette <- function(probKMA_results,align=FALSE,plot=TRUE){
   }else{
     # find minimum distance between the two pieces of curves, allowing alignment 
     # minimum overlap required: minimum motif length
-    # probKMA_result$c = vector: Cluster assignments for each curve
-    # Y_motifs = vector: Motif assignments for each curve
-    # probKMA_results$c[Y_motifs]: each curve is associated with the cluster to which its motif belongs
-    cc_motifs=apply(combn(probKMA_results$c[Y_motifs],2),2,min)# This gives the minimum index among the pairs of motif indices, and it is used as an indicator of the overlap required for alignment
+    cc_motifs=apply(combn(probKMA_results$c[Y_motifs],2),2,min) 
     SD=mapply(.find_min_diss,YY[1,],YY[2,],cc_motifs,
               MoreArgs=list(alpha=alpha,w=w,d,use0,use1),SIMPLIFY=TRUE)
   }
   YY_D=matrix(0,nrow=length(Y_motifs),ncol=length(Y_motifs))
-  YY_D[lower.tri(YY_D)]=SD[2,] #this step effectively fills in the lower triangular part of the matrix with the distances between the pairs of curve pieces.
-  YY_D=YY_D+t(YY_D) #Here,the matrix is made symmetric by adding its transpose to itself. This step ensures that the matrix YY_D is symmetric.
+  YY_D[lower.tri(YY_D)]=SD[2,]
+  YY_D=YY_D+t(YY_D)
   
   # compute intra-cluster distances
-  intra=Reduce(cbind,lapply(Y_motifs,function(motif) Y_motifs==motif))# This matrix computes the intra-cluster distances. It is a binary matrix, where each row corresponds to a specific motif and each column corresponds to a different curve piece
+  intra=Reduce(cbind,lapply(Y_motifs,function(motif) Y_motifs==motif))
   diag(intra)=FALSE
-  a=colSums(intra*YY_D)/(curves_in_motifs_number[Y_motifs]-1)#This vector calculates the average intra-cluster distance for each motif
+  a=colSums(intra*YY_D)/(curves_in_motifs_number[Y_motifs]-1)
   
   # compute inter-cluster distances
   b_k=Reduce(rbind,lapply(1:(K-1),
@@ -1330,24 +1313,24 @@ probKMA_silhouette <- function(probKMA_results,align=FALSE,plot=TRUE){
                             inter=Reduce(cbind,lapply(Y_motifs,
                                                       function(motif) Y_motifs==ifelse(motif+k>K,(motif+k)%%K,motif+k)))
                             b_k=colSums(inter*YY_D)/(curves_in_motifs_number[ifelse(Y_motifs+1>K,(Y_motifs+1)%%K,Y_motifs+1)])
-                            return(b_k)})) # b_k is a matrix where each row corresponds to a different motif, and each column corresponds to a different curve piece
+                            return(b_k)}))
   if(is.matrix(b_k)){
     b=apply(b_k,2,min)
   }else{
     b=b_k
-  } #b is a vector that calculates the minimum value along each column of b_k, resulting in the minimum inter-cluster distance for each curve piece.
+  }
   
   # compute silhouette
   silhouette=(b-a)/pmax(a,b)
   silhouette[is.nan(silhouette)]=0
   
   # compute average silhouette per cluster
-  silhouette_average=rep(NA,K) #store the average silhouette value for each cluster
+  silhouette_average=rep(NA,K)
   for(k in seq_len(K)){
-    silhouette_k=silhouette[Y_motifs==k] # Extract the silhouette values for the curve pieces that belong to cluster k
-    curves_in_motifs[[k]]=curves_in_motifs[[k]][order(silhouette_k,decreasing=TRUE)] # Reorder the curve pieces within the cluster based on their silhouette values(FOR PLOT)
-    silhouette[Y_motifs==k]=sort(silhouette_k,decreasing=TRUE)#Sort the silhouette values in descending order for the curve pieces in cluster k(FOR PLOT)
-    silhouette_average[k]=mean(silhouette_k) # compute the mean  
+    silhouette_k=silhouette[Y_motifs==k]
+    curves_in_motifs[[k]]=curves_in_motifs[[k]][order(silhouette_k,decreasing=TRUE)]
+    silhouette[Y_motifs==k]=sort(silhouette_k,decreasing=TRUE)
+    silhouette_average[k]=mean(silhouette_k)
   }
 
   ### plot silhouette ########################################################################################
@@ -1482,12 +1465,12 @@ find_candidate_motifs <- function(Y0,Y1=NULL,K,c,n_init=10,name='results',names_
   }
   
   ### run probKMA ##########################################################################################
-  i_c_K=expand.grid(seq_len(n_init),c,K) #all possible combinations
+  i_c_K=expand.grid(seq_len(n_init),c,K)
   results=.mapply_custom(cl_find,function(K,c,i){
-                                    dir.create(paste0(name,"_K",K,"_c",c),showWarnings=FALSE) #"name"_K"_c"
-                                    files=list.files(paste0(name,"_K",K,"_c",c)) #list files in the directory that was just created 
-                                    message("K",K,"_c",c,'_random',i) #i prints the message
-                                    if(paste0('random',i,'.RData') %in% files){#checks if a specific RData file named 'random' followed by the value of i with extension .RData is present in the list of files in the directory. If it is present, it loads the data from that RData file.
+                                    dir.create(paste0(name,"_K",K,"_c",c),showWarnings=FALSE)
+                                    files=list.files(paste0(name,"_K",K,"_c",c))
+                                    message("K",K,"_c",c,'_random',i)
+                                    if(paste0('random',i,'.RData') %in% files){
                                       load(paste0(name,"_K",K,"_c",c,'/random',i,'.RData'))
                                       return(list(probKMA_results=probKMA_results,
                                                   time=time,silhouette=silhouette))
@@ -1495,7 +1478,7 @@ find_candidate_motifs <- function(Y0,Y1=NULL,K,c,n_init=10,name='results',names_
                                       iter=iter_max=1
                                       while(iter==iter_max){
                                         start=proc.time()
-                                        probKMA_results=do.call(probKMA,c(list(Y0=Y0,Y1=Y1,K=K,c=c),probKMA_options)) #execute ProbKMA with default arguments
+                                        probKMA_results=do.call(probKMA,c(list(Y0=Y0,Y1=Y1,K=K,c=c),probKMA_options))
                                         end=proc.time()
                                         time=end-start
                                         iter=probKMA_results$iter
@@ -1503,7 +1486,7 @@ find_candidate_motifs <- function(Y0,Y1=NULL,K,c,n_init=10,name='results',names_
                                         if(iter==iter_max)
                                           warning('Maximum number of iteration reached. Re-starting.')
                                       }
-                                      pdf(paste0(name,"_K",K,"_c",c,'/random',i,'.pdf'),width=20,height=10) #open pdf file
+                                      pdf(paste0(name,"_K",K,"_c",c,'/random',i,'.pdf'),width=20,height=10)
                                       probKMA_plot(probKMA_results,ylab=names_var,cleaned=FALSE)
                                       dev.off()
                                       pdf(paste0(name,"_K",K,"_c",c,'/random',i,'clean.pdf'),width=20,height=10)
@@ -1518,8 +1501,8 @@ find_candidate_motifs <- function(Y0,Y1=NULL,K,c,n_init=10,name='results',names_
                                                   time=time,silhouette=silhouette))
                                     }
                                   },i_c_K[,3],i_c_K[,2],i_c_K[,1],SIMPLIFY=FALSE)
-  results=split(results,list(factor(i_c_K[,2],c),factor(i_c_K[,3],K))) #results is being split into subgroups based on two factors: the values of c and the value of K.This operation creates subgroups of results based on unique combinations of c and K
-  results=split(results,rep(K,each=length(c))) #each subgroup corresponds to a specific value of K.
+  results=split(results,list(factor(i_c_K[,2],c),factor(i_c_K[,3],K)))
+  results=split(results,rep(K,each=length(c)))
   
   ### plot silhouette average #################################################################################
   silhouette_average_sd=lapply(results,
@@ -1661,17 +1644,15 @@ find_candidate_motifs <- function(Y0,Y1=NULL,K,c,n_init=10,name='results',names_
 
   ### plot motif lengths ######################################################################################
   if(plot){
-    # calculate the motif length from a nested list structure of results
     motif_length=mapply(function(results){
                           motif_length=mapply(function(results){
                                                 motif_length=as.matrix(Reduce(cbind,lapply(results,
                                                                                            function(results){
-                                                                                             unlist(lapply(results$probKMA_results$V0,nrow)) #The lapply function iterates over each element in the current level of the nested results.
-                                                                                                                                             #For each element in the nested results, it accesses the probKMA_results$V0 attribute and calculates the number of rows in each matrix using nrow
-                                                                                           })))# non ho capito il senso dei primi due mapply
+                                                                                             unlist(lapply(results$probKMA_results$V0,nrow))
+                                                                                           })))
                                                 return(as.matrix(motif_length))
                                               },results,SIMPLIFY=FALSE)
-                        },results,SIMPLIFY=FALSE)#The result should be a matrix where each row corresponds to a specific level of nesting in the results structure, and each column corresponds to a different motif's length.
+                        },results,SIMPLIFY=FALSE)
     pdf(paste0(name,'_lengths.pdf'),width=7,height=5)
     motif_length_plot=lapply(motif_length,
                              function(motif_length){
@@ -1816,14 +1797,14 @@ find_candidate_motifs <- function(Y0,Y1=NULL,K,c,n_init=10,name='results',names_
   # sil_threshold: threshold on the average silhouette index
   # size_threshold: threshold on the size of the motif (number of curves in the cluster)
   
-  index_sil=which(silhouette$silhouette_average>=sil_threshold)#indices of clusters (motifs) with silhouette average values greater than or equal to a specified sil_threshold.
-  index_size=which(colSums(probKMA_results$P_clean)>=size_threshold) #index_size is a vector containing the indices of clusters (motifs) with number of curves in the cluster greater than or equal to a specified size_threshold.
+  index_sil=which(silhouette$silhouette_average>=sil_threshold)
+  index_size=which(colSums(probKMA_results$P_clean)>=size_threshold)
   index=intersect(index_sil,index_size)
   if(length(index)==0)
     return(NULL)
   return(list(V0_clean=probKMA_results$V0_clean[index],V1_clean=probKMA_results$V1_clean[index],
               D=probKMA_results$D[,index],D_clean=probKMA_results$D_clean[,index],P=probKMA_results$P[,index],P_clean=probKMA_results$P_clean[,index],
-              c=probKMA_results$c[index],K=rep(probKMA_results$K,length(index))))#If there are clusters that satisfy both criteria, the function returns a list containing specific elements of probKMA_results corresponding to the selected clusters
+              c=probKMA_results$c[index],K=rep(probKMA_results$K,length(index))))
 }
 
 
@@ -1873,18 +1854,18 @@ filter_candidate_motifs <- function(find_candidate_motifs_results,sil_threshold=
                                     load(paste0(name,"_K",K,"_c",c,'/random',i,'.RData'))
                                     motifs=.probKMA_silhouette_filter(probKMA_results,silhouette,sil_threshold,size_threshold)
                                     return(motifs)
-                                  })#This nested loop structure loads the filtered probKMA_results for each combination of K, c, and n_init, applies the filtering function .probKMA_silhouette_filter, and collects the resulting motifs.
+                                  })
                           })
                  })
-  motifs=unlist(unlist(motifs,recursive=FALSE),recursive=FALSE)#This line flattens the nested list structure into a single list of motif results.
+  motifs=unlist(unlist(motifs,recursive=FALSE),recursive=FALSE)
   if(is.null(unlist(motifs)))
     stop("No motif present after filtering. Please re-run the function with less stringent parameters.")
-  V0_clean=unlist(lapply(motifs,function(motifs) motifs$V0_clean),recursive=FALSE)# Extract V0_clean from each motif
-  V_clean_length=unlist(lapply(V0_clean,length)) # length of a matrix is the product of rows and columns 
+  V0_clean=unlist(lapply(motifs,function(motifs) motifs$V0_clean),recursive=FALSE)
+  V_clean_length=unlist(lapply(V0_clean,length))
   index=order(V_clean_length,decreasing=TRUE) # order from the longest to the shortest
-  V0_clean=V0_clean[index] # reodered in descreasing order
-  V1_clean=unlist(lapply(motifs,function(motifs) motifs$V1_clean),recursive=FALSE)[index] # reodered 
-  D_clean=Reduce(cbind,lapply(motifs,function(motifs) motifs$D_clean))[,index]# horizontally concatenated D_clean
+  V0_clean=V0_clean[index]
+  V1_clean=unlist(lapply(motifs,function(motifs) motifs$V1_clean),recursive=FALSE)[index]
+  D_clean=Reduce(cbind,lapply(motifs,function(motifs) motifs$D_clean))[,index]
   P_clean=Reduce(cbind,lapply(motifs,function(motifs) motifs$P_clean))[,index]
   c=Reduce(c,lapply(motifs,function(motifs) motifs$c))[index]
   K=Reduce(c,lapply(motifs,function(motifs) motifs$K))[index]
@@ -1932,7 +1913,6 @@ filter_candidate_motifs <- function(find_candidate_motifs_results,sil_threshold=
       return((1-alpha)*.diss_L2(y[[1]],v[[1]],w)+alpha*.diss_L2(y[[2]],v[[2]],w))
     }
   }
-  # returns a logical vector where FALSE means that the corresponing rows is full of NA
   .domain <- function(v,use0){
     if(use0){
       rowSums(!is.na(v[[1]]))!=0
@@ -1940,7 +1920,6 @@ filter_candidate_motifs <- function(find_candidate_motifs_results,sil_threshold=
       rowSums(!is.na(v[[2]]))!=0
     }
   }
-  # Select only the domain where the curve is defined 
   .select_domain <- function(v,v_dom,use0,use1){
     if(use0)
       v[[1]]=as.matrix(v[[1]][v_dom,])
@@ -1953,8 +1932,8 @@ filter_candidate_motifs <- function(find_candidate_motifs_results,sil_threshold=
   v_len=length(v_dom)
   SD_motif=lapply(Y,
                   function(y){
-                    y_len=unlist(lapply(y,nrow))[1] # lenght of the domain(curve)
-                    s_rep=seq_len(y_len-v_len+1) # possible starting points for the alignment between y and the motif v.
+                    y_len=unlist(lapply(y,nrow))[1]
+                    s_rep=seq_len(y_len-v_len+1)
                     y_rep=lapply(s_rep,
                                  function(i){
                                    y_rep=list(y0=NULL,y1=NULL)
@@ -1963,25 +1942,25 @@ filter_candidate_motifs <- function(find_candidate_motifs_results,sil_threshold=
                                    if(use1)
                                      y_rep$y1=as.matrix(y$y1[i-1+seq_len(v_len),])
                                    y_rep=.select_domain(y_rep,v_dom,use0,use1)
-                                 })#a sub-curve y_rep is extracted from the curve y, spanning the same length as the motif v
-                    valid=unlist(lapply(lapply(y_rep,.domain,use0),sum))>=c_k #Valid sub-curves are selected based on the minimum length requirement c_k
+                                 })
+                    valid=unlist(lapply(lapply(y_rep,.domain,use0),sum))>=c_k
                     s_rep=s_rep[valid]
                     y_rep=y_rep[valid]
-                    d_rep=unlist(lapply(y_rep,.diss_d0_d1_L2,.select_domain(v,v_dom,use0,use1),w,alpha)) #The dissimilarity between the sub-curve y_rep and the motif v is calculated using the .diss_d0_d1_L2(returns a vector)
-                    d_rep_R=c(FALSE,d_rep<=R,FALSE) #each element indicates whether the dissimilarity is less than or equal to a threshold R.
-                    diff_d_rep_R=diff(d_rep_R) #The differences in d_rep_R are computed using the diff function to identify the transitions from FALSE to TRUE and vice versa.
-                    start=which(diff_d_rep_R==1) # compute different allignment intervals
+                    d_rep=unlist(lapply(y_rep,.diss_d0_d1_L2,.select_domain(v,v_dom,use0,use1),w,alpha))
+                    d_rep_R=c(FALSE,d_rep<=R,FALSE)
+                    diff_d_rep_R=diff(d_rep_R)
+                    start=which(diff_d_rep_R==1)
                     end=which(diff_d_rep_R==(-1))-1
                     SD_motif=mapply(function(start,end){
-                                      index=(start:end)[which.min(d_rep[start:end])] #For each alignment interval, the index with the minimum dissimilarity is selected,
+                                      index=(start:end)[which.min(d_rep[start:end])]
                                       return(c(s_rep[index],d_rep[index]))
-                                    },start,end) #The resulting SD_motif list contains the starting point and corresponding dissimilarity values for each valid alignment interval.
+                                    },start,end)
                     return(SD_motif)
                   })
   if(!is.null(unlist(SD_motif))){
-    v_occurrences=cbind(rep(seq_along(SD_motif),unlist(lapply(SD_motif,length))/2), # Calculates the length of each element in the list SD_motif and divides the lengths by 2, as each element in SD_motif represents both a shift and a dissimilarity value.
-                        matrix(unlist(SD_motif),ncol=2,byrow=TRUE))                 # It assigns each shift-dissimilarity pair to its corresponding curve number using rep. Creates a matrix from the flattened SD_motif data, with two columns for shift and dissimilarity values.
-    row.names(v_occurrences)=NULL                                                   # combines the two results into a single matrix where the first column is the curve number, and the second and third columns are the shift and dissimilarity values, respectively.
+    v_occurrences=cbind(rep(seq_along(SD_motif),unlist(lapply(SD_motif,length))/2),
+                        matrix(unlist(SD_motif),ncol=2,byrow=TRUE))
+    row.names(v_occurrences)=NULL
     colnames(v_occurrences)=c('curve','shift','diss')
   }else{
     v_occurrences=c()
