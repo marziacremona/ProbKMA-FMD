@@ -226,7 +226,7 @@ library(dendextend)
 }
 
 
-.compute_Jk <- function(v,s_k,p_k,Y,alpha,w,m,c_k=NULL,keep_k=NULL,use0,use1){
+.compute_Jk <- function(v,s_k,p_k,Y,alpha,w,m,use0,use1,c_k=NULL,keep_k=NULL){
   # Compute the objective function J for the motif k.
   # v: list of two elements, v0=v(x), v1=v'(x), matrices with d columns.
   # s_k: shift vector for motif k.
