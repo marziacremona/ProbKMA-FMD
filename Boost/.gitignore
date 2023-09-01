@@ -20,4 +20,9 @@ src/RcppExports.cp
 *.so
 
 Makevars
-Makevars.win
+Makevars.wi
+
+../.gitignore
+src/Makevars.win
+src/Makevars
+png
