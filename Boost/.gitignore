@@ -25,3 +25,4 @@ Makevars.wi
 ../.gitignore
 src/Makevars.win
 src/Makevars
+png
