@@ -771,45 +771,47 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
         for(k in empty_k)
           keep[which.min(D[,k]),k]=TRUE
       }
+      
       res_left_right=mapply(function(v_new_k,v_dom_k,s_k,p_k,len_elong_k,keep_k,c){
-                              if(length(len_elong_k)==0){
-                                return(list(v_new=v_new_k,
-                                            v_dom=v_dom_k,
-                                            s_k=s_k))
-                              }
-                              s_k_elong_left_right=rep(lapply(c(0,len_elong_k),function(len_elong_k) s_k-len_elong_k),(length(len_elong_k)+1):1)[-1]
-                              v_dom_elong_left_right=unlist(lapply(c(0,len_elong_k),
-                                                                   function(len_elong_k_left)
-                                                                     lapply(c(0,len_elong_k[len_elong_k<=(max(len_elong_k)-len_elong_k_left)]),
-                                                                            function(len_elong_k_right) 
-                                                                              c(rep_len(TRUE,len_elong_k_left),v_dom_k,rep_len(TRUE,len_elong_k_right)))),
-                                                            recursive=FALSE)[-1]
-                              v_elong_left_right=mapply(.compute_motif,v_dom_elong_left_right,s_k_elong_left_right,
-                                                        MoreArgs=list(p_k,Y,m,use0,use1),SIMPLIFY=FALSE)
-                              start_with_NA=unlist(lapply(v_elong_left_right,length))>2
-                              v_elong_left_right=v_elong_left_right[!start_with_NA]
-                              s_k_elong_left_right=s_k_elong_left_right[!start_with_NA]
-                              Jk_before=.compute_Jk(v_new_k,s_k,p_k,Y,alpha,w,m,use0=use0,use1=use1)
-                              c_k_after=floor(unlist(lapply(lapply(v_elong_left_right,.domain,use0),length))*(1-max_gap))
-                              c_k_after[c_k_after<c]=c
-                              Jk_after=unlist(mapply(.compute_Jk,v_elong_left_right,s_k_elong_left_right,c_k_after,
-                                                     MoreArgs=list(p_k=p_k,Y=Y,alpha=alpha,w=w,m=m,keep_k=keep_k,use0=use0,use1=use1)))
-                              best_elong=which.min((Jk_after-Jk_before)/Jk_before)
-                              if(length(best_elong)>0){
-                                elongate=((Jk_after-Jk_before)/Jk_before)[best_elong]<deltaJk_elong
-                              }else{
-                                elongate=FALSE
-                              }
-                              if(elongate){
-                                return(list(v_new=v_elong_left_right[[best_elong]],
-                                            v_dom=v_dom_elong_left_right[[best_elong]],
-                                            s_k=s_k_elong_left_right[[best_elong]]))
-                              }else{
-                                return(list(v_new=v_new_k,
-                                            v_dom=v_dom_k,
-                                            s_k=s_k))
-                              }
-                            },V_new,V_dom,S_k,P_k,len_elong,split(keep,rep(1:K,each=N)),c)
+        if(length(len_elong_k)==0){
+          return(list(v_new=v_new_k,
+                      v_dom=v_dom_k,
+                      s_k=s_k))
+        }
+        s_k_elong_left_right=rep(lapply(c(0,len_elong_k),function(len_elong_k) s_k-len_elong_k),(length(len_elong_k)+1):1)[-1]
+        v_dom_elong_left_right=unlist(lapply(c(0,len_elong_k),
+                                             function(len_elong_k_left)
+                                               lapply(c(0,len_elong_k[len_elong_k<=(max(len_elong_k)-len_elong_k_left)]),
+                                                      function(len_elong_k_right) 
+                                                        c(rep_len(TRUE,len_elong_k_left),v_dom_k,rep_len(TRUE,len_elong_k_right)))),
+                                      recursive=FALSE)[-1]
+        v_elong_left_right=mapply(.compute_motif,v_dom_elong_left_right,s_k_elong_left_right,
+                                  MoreArgs=list(p_k,Y,m,use0,use1),SIMPLIFY=FALSE)
+        start_with_NA=unlist(lapply(v_elong_left_right,length))>2
+        v_elong_left_right=v_elong_left_right[!start_with_NA]
+        s_k_elong_left_right=s_k_elong_left_right[!start_with_NA]
+        Jk_before=.compute_Jk(v_new_k,s_k,p_k,Y,alpha,w,m,use0=use0,use1=use1)
+        c_k_after=floor(unlist(lapply(lapply(v_elong_left_right,.domain,use0),length))*(1-max_gap))
+        c_k_after[c_k_after<c]=c
+        Jk_after=unlist(mapply(.compute_Jk,v_elong_left_right,s_k_elong_left_right,c_k_after,
+                               MoreArgs=list(p_k=p_k,Y=Y,alpha=alpha,w=w,m=m,keep_k=keep_k,use0=use0,use1=use1)))
+        best_elong=which.min((Jk_after-Jk_before)/Jk_before)
+        if(length(best_elong)>0){
+          elongate=((Jk_after-Jk_before)/Jk_before)[best_elong]<deltaJk_elong
+        }else{
+          elongate=FALSE
+        }
+        if(elongate){
+          return(list(v_new=v_elong_left_right[[best_elong]],
+                      v_dom=v_dom_elong_left_right[[best_elong]],
+                      s_k=s_k_elong_left_right[[best_elong]]))
+        }else{
+          return(list(v_new=v_new_k,
+                      v_dom=v_dom_k,
+                      s_k=s_k))
+        }
+      },V_new,V_dom,S_k,P_k,len_elong,split(keep,rep(1:K,each=N)),c)
+      
       V_new=res_left_right[1,]
       V_dom=res_left_right[2,]
       S_k=res_left_right[3,]
