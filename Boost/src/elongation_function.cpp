@@ -22,6 +22,8 @@ List repeat_elements(const imat& A,const ivec & times) {
   return result;
 }
 
+
+
 double compute_Jk_rcpp(const List & v,
                        const ivec & s_k,
                        const vec & p_k,
@@ -48,8 +50,8 @@ double compute_Jk_rcpp(const List & v,
   // select the part of the domain of the centroid
   List v_new = select_domain(v, v_dom, use0, use1);
   
-  const List & first_y = Y[0]; // Y is list of list, first_y is the first list, first_y[0] is the first list of first_y 
-  const mat & first_y0 = as<mat>(first_y[0]);
+  const List& first_y = Y[0]; // Y is list of list, first_y is the first list, first_y[0] is the first list of first_y 
+  const mat& first_y0 = as<mat>(first_y[0]);
   
   // dimensionality of the curves
   const unsigned int d = first_y0.n_cols;
@@ -61,80 +63,71 @@ double compute_Jk_rcpp(const List & v,
   
   // curves shifted as s_k says 
   List Y_inters_k(Y_size);
-  
   for (unsigned int i = 0; i < Y_size; ++i){
     List y_inters_k = List::create(Named("y0") = R_NilValue,
                                    Named("y1") = R_NilValue);
-    int s_k_i = s_k[i];
+    const int& s_k_i = s_k[i];
+    const ivec& index = regspace<ivec>(1, v_len - std::max(0, 1-s_k_i)) + std::max(1,s_k_i) - 1;
+    int index_size = index.size();
+    const List& y_i = Y[i];
     
-    const ivec & index = regspace<ivec>(1, v_len - std::max(0, 1-s_k_i)) + std::max(1,s_k_i) - 1;
-    
-    unsigned int index_size = index.size();
-    
-    const List & y_i = Y[i];
-    
+    mat new_y01(index_size + std::max(0, 1-s_k_i), d);
     if (use0){
-      const mat & temp_y0_i = as<mat>(y_i[0]);
-      mat new_y0(index_size + std::max(0, 1-s_k_i), d);
-      new_y0.fill(datum::nan);
-      for(unsigned int j = 0; j < index_size; ++j) {
-        if (index[j]  <= y_len){
-          new_y0.row(std::max(0, 1-s_k_i) + j) =  temp_y0_i.row(index[j] - 1);
-        }
-      }
-      y_inters_k["y0"] = new_y0;
+      const mat& temp_y0_i = as<mat>(y_i[0]);
+      new_y01.fill(datum::nan);
+      
+      auto filtered_j = std::views::iota(0,index_size)
+        | std::views::filter([&y_len,index](int j){return index[j] <= y_len;});
+      for(int j : filtered_j)
+        new_y01.row(std::max(0, 1-s_k_i) + j) =  temp_y0_i.row(index[j] - 1);
+      
+      y_inters_k["y0"] = new_y01;
     }
 
     if (use1){
-      const mat & temp_y1_i = as<mat>(y_i[1]);
-      mat new_y1(index_size + std::max(0, 1-s_k_i), d);
-      new_y1.fill(datum::nan);
-      for(unsigned int j = 0; j < index_size; ++j) {
-        if (index[j] <= y_len){
-          new_y1.row(std::max(0, 1-s_k_i) + j) =  temp_y1_i.row(index[j] - 1);
-        }
-      }
-      y_inters_k["y1"] = new_y1;
+      const mat& temp_y1_i = as<mat>(y_i[1]);
+      new_y01.fill(datum::nan);
+      
+      auto filtered_j = std::views::iota(0,index_size)
+        | std::views::filter([&y_len,index](int j){return index[j] <= y_len;});
+      for(int j : filtered_j)
+        new_y01.row(std::max(0, 1-s_k_i) + j) =  temp_y1_i.row(index[j] - 1);
+      
+      y_inters_k["y1"] = new_y01;
     }
     Y_inters_k[i] = as<List>(select_domain(y_inters_k,v_dom,use0,use1));
   }
   
-  // @TODO: check other implementations for lines 83 to 96
   // nullable objects of Rcpp have to be converted to usual objects (necessary as in the prof function)
   // @TODO: check output of this part of the code because in the test keep_k.isNotNull() && c_k.isNotNull() == FALSE
   if(keep_k.isNotNull() && c_k.isNotNull()){
     
-    NumericVector supp_inters_length;
-    
     LogicalVector keep_k_notnull = as<LogicalVector>(keep_k);
-    
-    for (uword i = 0; i < Y_size; ++i){
-      if (keep_k_notnull[i]){
-        LogicalVector domain_y_inters_k  = as<LogicalVector>(domain(Y_inters_k[i],use0));
-        supp_inters_length.push_back(sum(domain_y_inters_k));
-      }
+    auto filtered_Y_inters = std::views::iota(0,Y.size()) 
+        | std::views::filter([&keep_k_notnull](int j){return keep_k_notnull[j];})
+        | std::views::transform([&Y_inters_k](int j){return Y_inters_k[j];});
+
+    NumericVector supp_inters_length(std::ranges::distance(filtered_Y_inters));
+    for (unsigned int i = 0; auto y_filtered:filtered_Y_inters){
+      uvec domain_y_inters_k  = as<uvec>(domain(y_filtered,use0));
+      supp_inters_length[i++] = sum(domain_y_inters_k);
     }
     
     int c_k_notnull = as<int>(c_k);
-    
     LogicalVector check_lengths = supp_inters_length < c_k_notnull;
     
-    if (is_true(any(check_lengths))){
-      return NA_REAL;
-    }
+    if (is_true(any(check_lengths))) return NA_REAL;
   }
   
   vec dist(Y_size);
-  for (uword i = 0; i < Y_size; ++i){
-    dist(i) = as<double>(diss_d0_d1_L2(Y_inters_k[i], v_new, w, alpha));
+  for (uword i = 0; i < Y_size; ++i)
+  {
+    dist[i] = as<double>(diss_d0_d1_L2(Y_inters_k[i], v_new, w, alpha));
   }
-  
   vec result = dist % pow(p_k,m);
   
-  return accu(result.elem(find_finite(result))); //@TODO: improve this because cos� per� escludo non solo i Nan ma anche gli infiniti
+  return sum(result.elem(find_finite(result))); //@TODO: improve this because cos� per� escludo non solo i Nan ma anche gli infiniti
 }
-
-
 
 
 // [[Rcpp::export]]
@@ -181,14 +174,14 @@ List elongation_rcpp(const List & v_new_k,
   const std::size_t v_dom_k_len = v_dom_k.n_elem;
   std::size_t max_len_elong_k = len_elong_k.back();
   List v_dom_elong_left_right((max_len_elong_k+1)*(max_len_elong_k+2)/2); 
-  std::size_t i = 0;
-  for(const int len_elong_k_left:len_elong_k_zero)
+  
+  for(std::size_t i = 0;const int len_elong_k_left:len_elong_k_zero)
   {
     uvec temp(len_elong_k_left + v_dom_k_len + len_elong_k_zero[max_len_elong_k],fill::ones);
     std::copy(v_dom_k.begin(), v_dom_k.end(), temp.begin() + len_elong_k_left);
     for(unsigned int j = 0; j < max_len_elong_k+1;++j)
     {
-      const uvec& temp_subwiew = temp(regspace<uvec>(0,1,len_elong_k_left + v_dom_k_len + len_elong_k_zero[j]-1)); //v_dom_k_len = 0 invalido
+      const uvec& temp_subwiew = temp(regspace<uvec>(0,1,len_elong_k_left + v_dom_k_len + len_elong_k_zero[j]-1)); 
       v_dom_elong_left_right[i++] = temp_subwiew;
     }
     --max_len_elong_k;
@@ -213,16 +206,13 @@ List elongation_rcpp(const List & v_new_k,
   // filter the domain, centroid and shifts that are not in NA positions
   auto not_NA_index = std::views::iota(0,v_elong_left_right_size) 
     | std::views::filter([&start_with_NA](int index_j){return(!start_with_NA[index_j]);});
-  List new_v(std::distance(not_NA_index.begin(),not_NA_index.end()));
-  List new_s(std::distance(not_NA_index.begin(),not_NA_index.end()));
-  i = 0;
-  std::for_each(not_NA_index.begin(),not_NA_index.end(),
-                [&new_v,&new_s,&v_elong_left_right,
-                 &s_k_elong_left_right,&i]
-                 (int j){new_v[i] = as<List>(v_elong_left_right[j]);
-                         new_s[i++] = s_k_elong_left_right[j];});
-  v_elong_left_right = new_v;
-  s_k_elong_left_right = new_s;
+  auto filtered_elong = not_NA_index 
+                        | std::views::transform([&v_elong_left_right](int j){return v_elong_left_right[j];});
+  auto filtered_s_k = not_NA_index 
+                      | std::views::transform([&s_k_elong_left_right](int j){return s_k_elong_left_right[j];});
+  
+  v_elong_left_right = List(filtered_elong.begin(),filtered_elong.end());
+  s_k_elong_left_right = List(filtered_s_k.begin(),filtered_s_k.end());
   
   // compute performance index before elongation
   double Jk_before = compute_Jk_rcpp(v_new_k, s_k, p_k, Y, alpha, w, m, use0, use1);
@@ -234,10 +224,10 @@ List elongation_rcpp(const List & v_new_k,
   for (uword i = 0; i < v_elong_left_right_size; i++) {
     const uvec& domain_elong = as<uvec>(domain(v_elong_left_right[i], use0));
     int c_i =  std::max(floor(domain_elong.n_elem*(1 - max_gap)),c); 
-    c_k_after(i) = c_i; // avoid if, next line
+    c_k_after[i] = c_i; // avoid if, next line
     const List& v_i = v_elong_left_right[i];
     const ivec& s_i = s_k_elong_left_right[i];
-    Jk_after(i) = compute_Jk_rcpp(v_i, s_i, p_k, Y, alpha, w, m,use0 , use1,wrap(c_i),as<LogicalVector>(wrap(keep_k)));
+    Jk_after[i] = compute_Jk_rcpp(v_i, s_i, p_k, Y, alpha, w, m,use0 , use1,wrap(c_i),as<LogicalVector>(wrap(keep_k)));
   }
 
   // find the best elongation in terms of perf. index
