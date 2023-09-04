@@ -51,7 +51,7 @@ double compute_Jk_rcpp(const List & v,
   List v_new = select_domain(v, v_dom, use0, use1);
   
   const List& first_y = Y[0]; // Y is list of list, first_y is the first list, first_y[0] is the first list of first_y 
-  const mat& first_y0 = as<mat>(first_y[0]);
+  const mat& first_y0 = use0 ? as<mat>(first_y[0]):as<mat>(first_y[1]);
   
   // dimensionality of the curves
   const unsigned int d = first_y0.n_cols;
