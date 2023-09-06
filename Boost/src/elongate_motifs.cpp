@@ -256,9 +256,9 @@ List elongation_rcpp(const List & v_new_k,
 
 // function which returns V_new, V_dom, S_k after the elongation 
 // [[Rcpp::export]]
-void elongate_motifs(List & V_new,
-                     List & V_dom,
-                     List & S_k,
+void elongate_motifs( List & V_new,
+                      List & V_dom,
+                      List & S_k,
                      const List & P_k,
                      const List & Y,
                      const vec & w, //in this case is a number
@@ -308,7 +308,7 @@ void elongate_motifs(List & V_new,
                                            m,
                                            use0,
                                            use1));
-      Jk_before[i] = as<double>(compute_Jk(V_new[with_gaps[i]],
+      Jk_before[i] = compute_Jk_rcpp(V_new[with_gaps[i]],
                                 S_k[with_gaps[i]],
                                 P_k[with_gaps[i]],
                                 Y,
@@ -316,8 +316,8 @@ void elongate_motifs(List & V_new,
                                 w,
                                 m,
                                 use0,
-                                use1));
-      Jk_after[i] = as<double>(compute_Jk(V_filled[i],
+                                use1);
+      Jk_after[i] = compute_Jk_rcpp(V_filled[i],
                                S_k[with_gaps[i]],
                                P_k[with_gaps[i]],
                                Y,
@@ -325,7 +325,7 @@ void elongate_motifs(List & V_new,
                                w,
                                m,
                                use0,
-                               use1));
+                               use1);
     }
     // if filling the domain improves the perf. index over a certain threshold replace the domain and the motifs with the filled one
     const uvec& fill = (Jk_after-Jk_before)/Jk_before < deltaJk_elong;
@@ -372,15 +372,15 @@ void elongate_motifs(List & V_new,
 
     Function domain(".domain");
     for (unsigned int i = 0; i < V_dom_size; ++i){
-    List V_new_i = V_new[i];
-    uvec V_dom_i = as<uvec>(V_dom[i]);
-    ivec S_k_i = S_k[i];
-    vec  p_k_i = P_k[i];
-    ivec len_elong_k_i = len_elong[i];
-    uvec keep_k_i = keep.col(i);
-    int  c_i = c[i];
+    const List& V_new_i = V_new[i];
+    const uvec& V_dom_i = as<uvec>(V_dom[i]);
+    const ivec& S_k_i= S_k[i];
+    const vec& p_k_i = P_k[i];
+    const ivec& len_elong_k_i = len_elong[i];
+    const uvec& keep_k_i = keep.col(i);
+    const int&  c_i = c[i];
       
-    const List& result = elongation_rcpp( V_new_i,
+    const List& result = elongation_rcpp(   V_new_i,
                                             V_dom_i,
                                             S_k_i,
                                             p_k_i,
