@@ -281,9 +281,10 @@ void elongate_motifs( List & V_new,
   
   auto filtered_j = std::views::iota(0,V_dom_size)
     | std::views::filter([&V_dom,&len_dom](int j){
-      const LogicalVector& v_dom = V_dom[j];
+      const uvec& v_dom = V_dom[j];
+      const uvec& gaps_in_v_dom = find(v_dom == 0);
       len_dom[j] = v_dom.size();
-      return sum(!v_dom)!= 0;});
+      return gaps_in_v_dom.n_elem > 0;});
   
   NumericVector with_gaps(filtered_j.begin(),filtered_j.end());
   int with_gaps_size = with_gaps.size(); 
