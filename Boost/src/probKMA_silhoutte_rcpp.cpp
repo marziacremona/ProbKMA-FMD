@@ -11,22 +11,62 @@ using namespace arma;
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::plugins(cpp20)]]
 
-List combn_rcpp(const List & y, // template version to be done
-                int r) {
-  List result; // the size can be set using factorial, not provided by c++
-  const unsigned int n = y.size();
-  uvec v(n, fill::zeros); 
-  std::fill(v.begin(),v.begin() + r, 1); // the first two elements are true
-  do {
-    List temp(r);
-    unsigned int k = 0; //ho bisogno di un puntatore che scorre su temp
-    for (int i = 0; i < n; ++i) { //itero su y
-      if (v[i]) {
-        temp[k++] = y[i];
-      }
-    }
-    result.push_back(temp);
-  } while (std::prev_permutation(v.begin(), v.end()));
+template<typename T>
+decltype(auto) combn2(const T & y){ 
+  int n = y.n_elem;
+  uvec v(n,fill::zeros);  
+  v(0) = 1;
+  v(1) = 1;
+  std::size_t l = 0;
+  if constexpr(std::is_same<typename T::value_type, vec::value_type>::value) {
+    mat result(2,n*(n-1)/2, fill::zeros); 
+    std::size_t k;
+    do {
+      k = 0;
+      auto filter_index = std::views::iota(0,n) 
+        | std::views::filter([&v](int i){return v(i);});
+      for(auto i: filter_index) 
+        result(k++,l) = y(i); 
+      l++;
+    } while (std::prev_permutation(v.begin(), v.end())); 
+    return result;
+  } else if constexpr(std::is_same<typename T::value_type, uvec::value_type>::value){
+    umat result(2,n*(n-1)/2, fill::zeros); 
+    std::size_t k;
+    do {
+      k = 0;
+      auto filter_index = std::views::iota(0,n) 
+        | std::views::filter([&v](int i){return v(i);});
+      for(auto i: filter_index) 
+        result(k++,l) = y(i); 
+      l++;
+    } while (std::prev_permutation(v.begin(), v.end()));
+    return result;
+  } else if constexpr(std::is_same<typename T::value_type, ivec::value_type>::value){
+    imat result(2,n*(n-1)/2, fill::zeros); 
+    std::size_t k;
+    do {
+      k = 0;
+      auto filter_index = std::views::iota(0,n) 
+        | std::views::filter([&v](int i){return v(i);});
+      for(auto i: filter_index) 
+        result(k++,l) = y(i); 
+      l++;
+    } while (std::prev_permutation(v.begin(), v.end())); 
+    return result;
+  }
+}
+
+template<class T>
+T repLem(const T & v,
+         const ivec & times){
+  T result(accu(times));
+  std::size_t k = 0;
+  std::size_t times_size = times.size();
+  // check times_size == v.size()
+  for (std::size_t i = 0; i < times_size; ++i) 
+    for (std::size_t j = 0; j < times[i]; ++j)
+      result(k++) = v(i);
   return result;
 }
 
@@ -47,6 +87,7 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
     const List & Y1 = probKMA_results["Y1"];
     Y_size = Y1.size();
   }
+  
   List Y(Y_size);
   
   // to declare as external functions and used also in probKMA
@@ -95,10 +136,11 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
   const unsigned int K = probKMA_results["K"];
   const List & motifs = use0 ? probKMA_results["V0"] : probKMA_results["V1"];
   
-  List V_dom(K); // each element will be an uvec
+  std::vector<uvec> V_dom(K); // each element will be an uvec
   ivec V_length(K);
   unsigned int i = 0;
   unsigned int j;
+  
   // V_dom for each centroid contains an uvec with 0 if all the elements of the row of the centroid are NA
   for(unsigned int i = 0; i < K; ++i){
     const mat & v = motifs[i];
@@ -111,10 +153,10 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
   }
  
  // extract pieces of curves that fall in the different motifs
- const mat & P_clean = probKMA_results["P_clean"];
- List curves_in_motifs(P_clean.n_cols);
+ const imat & P_clean = probKMA_results["P_clean"];
+ List curves_in_motifs(P_clean.n_cols); //TODO: change List
  for (unsigned int k = 0; k < P_clean.n_cols; ++k) {
-   const vec & P_clean_k = P_clean.col(k);
+   const ivec & P_clean_k = P_clean.col(k);
    const uvec & P_clean_1 = find(P_clean_k == 1); // to check in case 1 doesn't exist in the col
    curves_in_motifs[k] = P_clean_1;
  }
@@ -122,12 +164,10 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
  // if(!is.null(ncol(curves_in_motifs))) this if condition makes no sense since curves_in_motifs is a list
  //   curves_in_motifs=split(curves_in_motifs,rep(seq_len(ncol(curves_in_motifs)),each=nrow(curves_in_motifs))) to be implemented and understood
  
- const vec & curves_in_motifs_number=sum(P_clean,0).t();
- //return List::create(curves_in_motifs_number);
+ const ivec & curves_in_motifs_number=sum(P_clean,0).t();
  
  const imat & S_clean = probKMA_results["S_clean"];
- List S_clean_k(S_clean.n_cols);
- // for sure there exists a clever way to select the elements indexed 
+ List S_clean_k(S_clean.n_cols); // TODO: change List
  for (unsigned int k=0; k < S_clean.n_cols; ++k){
   const ivec & col_S_clean = S_clean.col(k);
   const uvec & curves_in_motifs_k = curves_in_motifs[k];
@@ -136,7 +176,7 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
  }
  
  // compute distances between pieces of curves
- List Y_in_motifs;
+ List Y_in_motifs; // TODO : initialize size
  for (unsigned int i= 0; i < K; ++i){
    const uvec & curves_in_motif = curves_in_motifs[i];
    const ivec & s_k = S_clean_k[i];
@@ -177,58 +217,33 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
    }
  }
  
-
- ivec Y_motifs(accu(curves_in_motifs_number));
- unsigned int k = 0;
- for (unsigned int i = 0; i < K; ++i){
-   for (unsigned int j = 0; j < curves_in_motifs_number[i]; ++j){
-     Y_motifs(k++) = i;
-   }
- }
-
- List YY = combn_rcpp(Y_in_motifs,2); 
- // YY=array(unlist(YY,recursive=FALSE),dim=c(2,length(YY))) not done, not usefull?!
+ uvec Y_motifs = repLem<uvec>(regspace<uvec>(0,K-1),curves_in_motifs_number);
+ const unsigned int Y_motifs_size = Y_motifs.size();
  
- //sorting di V_length ?!
- List V_length_Y_motifs(accu(curves_in_motifs_number)); // potrebbe essere ivec se combn_rcpp fosse template
- List c_Y_motifs(accu(curves_in_motifs_number));
+ unsigned int Y_in_motifs_size = Y_in_motifs.size();
+ 
+ umat indeces_YY = combn2<uvec>(regspace<uvec>(0,Y_in_motifs_size-1)); //combn of indeces of YY
+ 
+ ivec V_length_Y_motifs = repLem<ivec>(V_length,curves_in_motifs_number);
+ 
  const ivec& c = probKMA_results["c"];
- k = 0;
- for (unsigned int i = 0; i < K; ++i){
-   for (unsigned int j = 0; j < curves_in_motifs_number[i]; ++j){
-     const unsigned int V_length_i = V_length[i];
-     const unsigned int c_i = c[i];
-     c_Y_motifs[k] = c_i;
-     V_length_Y_motifs[k] = V_length_i;
-     k++;
-   }
- }
  
- List YY_lengths = combn_rcpp(V_length_Y_motifs,2);
+ ivec c_Y_motifs = repLem<ivec>(c,curves_in_motifs_number);
  
- const unsigned int YY_length_size = YY_lengths.size(); 
- uvec swap(YY_length_size);
- uvec equal_length(YY_length_size);
- for (unsigned int i = 0; i < YY_length_size; ++i){
-   const List & yy_len = YY_lengths[i];
-   const unsigned int yy_len0 = yy_len[0];
-   const unsigned int yy_len1 = yy_len[1];
-   swap(i) = yy_len0 < yy_len1;
-   equal_length(i) = yy_len0 == yy_len1;
- }
+ imat YY_lengths = combn2<ivec>(V_length_Y_motifs);
  
- // to be checked swap part since swap is all zeros
- const int YY_size = YY.size();
- 
- auto filtered_j_swap = std::views::iota(0,YY_size) 
+ const int YY_length_size = YY_lengths.n_cols;
+ const ivec & YY_length_row0 = YY_lengths.row(0).t();
+ const ivec & YY_length_row1 = YY_lengths.row(1).t();
+ uvec swap = (YY_length_row0 < YY_length_row1); // const & to be add
+ const uvec & equal_length = (YY_length_row0 == YY_length_row1);
+
+ auto filtered_j_swap = std::views::iota(0,YY_length_size) 
    | std::views::filter([&swap](int j){return swap(j);});
  
  // to use std::swap o alternatives, to be checked
  for (int j : filtered_j_swap){
-   List yy = YY[j]; // check: in this way I'm modifying also YY, I'm quite sure yes (this case test is not enough)
-   const List && yy0 = yy[0];
-   yy[0] = yy[1];
-   yy[1] = yy0;
+   std::swap(indeces_YY(0,j),indeces_YY(1,j));
  }
  
  Function find_min_diss(".find_min_diss");
@@ -239,9 +254,8 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
  
  if(align){
    for(unsigned int i = 0; i < YY_length_size; ++i){
-     List yy = YY[i];
-     List yy0 = yy[0];
-     List yy1 = yy[1];
+     const List & yy0 = Y_in_motifs[indeces_YY(0,i)];
+     const List & yy1 = Y_in_motifs[indeces_YY(1,i)];
      bool equal_length_i = equal_length(i);
      NumericVector min_diss_aligned = as<NumericVector>(find_diss(yy0,    
                                                                   yy1,
@@ -255,16 +269,12 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
      SD(1,i) = min_diss_aligned[1];
    }
  }else{ //else condition to be checked
-   List c_Y_motifs_comb = combn_rcpp(c_Y_motifs,2);
+   imat c_Y_motifs_comb = combn2<ivec>(c_Y_motifs);  
    for(unsigned int i = 0; i < YY_length_size; ++i){
-     List yy = YY[i];
-     List yy0 = yy[0];
-     List yy1 = yy[1];
-     const List & c_Y_motifs_comb_i = c_Y_motifs_comb[i];
-     unsigned int c_Y_motifs_comb_i0 = c_Y_motifs_comb_i[0];
-     unsigned int c_Y_motifs_comb_i1 = c_Y_motifs_comb_i[1];
-     const unsigned int cc_motifs_i = std::min(c_Y_motifs_comb_i0,
-                                               c_Y_motifs_comb_i1);
+     const List & yy0 = Y_in_motifs[indeces_YY(0,i)];
+     const List & yy1 = Y_in_motifs[indeces_YY(1,i)];
+     const unsigned int cc_motifs_i = std::min(c_Y_motifs_comb(0,i),
+                                               c_Y_motifs_comb(1,i));
      NumericVector min_diss = as<NumericVector>(find_min_diss(yy0,    
                                                               yy1,
                                                               alpha,
@@ -279,9 +289,8 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
   
  }
  
- const unsigned int Y_motifs_size = accu(curves_in_motifs_number); // to be declared above, multiple invocations to accu
  mat YY_D(Y_motifs_size,Y_motifs_size,fill::zeros);
- k = 0;
+ unsigned int k = 0;
  for (unsigned int j = 0; j < Y_motifs_size; ++j){
    for (unsigned int i = j+1; i <  Y_motifs_size; ++i){
      YY_D(i,j) = SD(1,k);
@@ -294,43 +303,30 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
  // compute intra-cluster distances
  umat intra(Y_motifs_size,Y_motifs_size,fill::zeros);
  for(unsigned int i = 0; i < Y_motifs_size; ++i){
-   const int Y_motifs_i = Y_motifs[i];
-   const uvec & temp = (Y_motifs == Y_motifs_i);
+   const uvec & temp = (Y_motifs == Y_motifs(i));
    intra.col(i) = temp;
  }
  intra.diag() *= 0;
- vec curves_in_motifs_number_Y_motifs(Y_motifs_size); // TODO: change name
- for (unsigned int i = 0; i < Y_motifs_size; ++i){
-   curves_in_motifs_number_Y_motifs(i) = curves_in_motifs_number(Y_motifs(i));
- }
- vec a = sum(intra%YY_D, 0).t();
- a /= (curves_in_motifs_number_Y_motifs - 1);
  
+ const vec & curves_in_motifs_number_Y_motifs = conv_to<vec>::from(curves_in_motifs_number.elem(Y_motifs));
+ const vec & a = sum(intra%YY_D, 0).t()/(curves_in_motifs_number_Y_motifs - 1);
+
  // compute inter-cluster distances
  Y_motifs += 1;
- ivec Y_motifs_condition(Y_motifs_size);
- for(unsigned int i=0; i < Y_motifs_size; ++i){
-   if (Y_motifs(i)+1>K)
-     Y_motifs_condition(i) = (Y_motifs(i)+1)%K;
-   else
-     Y_motifs_condition(i) = Y_motifs(i)+1;
- }
- 
- vec curves_in_motifs_number_Y_motifs_new(Y_motifs_size); //TODO : change name
- Y_motifs_condition -= 1;
- for (unsigned int i = 0; i < Y_motifs_size; ++i){
-   curves_in_motifs_number_Y_motifs_new(i) = curves_in_motifs_number(Y_motifs_condition(i));
- }
+ uvec Y_motifs_mod(Y_motifs_size);
+ for(unsigned int i=0; i < Y_motifs_size; ++i)
+     Y_motifs_mod(i) = Y_motifs(i)+1>K ? (Y_motifs(i)+1)%K - 1 : Y_motifs(i);
+ const vec & curves_in_motifs_number_rep = conv_to<vec>::from(curves_in_motifs_number.elem(Y_motifs_mod));
  
  umat inter(Y_motifs_size,Y_motifs_size,fill::zeros);
  mat b_k(K-1,Y_motifs_size,fill::zeros);
- for(unsigned int k = 1; k <= K-1;++k){
+ for(unsigned int k = 1; k <= K-1; ++k){
    for(unsigned int i = 0; i < Y_motifs_size; ++i){
-    const int motif = Y_motifs[i];
-    const unsigned int temp_num = (motif+k)>K? (motif+k)%K : motif+k; //TODO : change name
-    inter.col(i) = (Y_motifs== temp_num);
-    b_k.row(k-1) = sum(inter%YY_D,0)/(curves_in_motifs_number_Y_motifs_new.t());
+    const int motif = Y_motifs(i);
+    const unsigned int inter_motif = (motif+k)>K? (motif+k)%K : motif+k; 
+    inter.col(i) = (Y_motifs== inter_motif);
    }
+   b_k.row(k-1) = sum(inter%YY_D,0)/(curves_in_motifs_number_rep.t());
  }
  
  // to be tested because in my test b_k was already a matrix
@@ -340,7 +336,6 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
  }else{
    b = b_k.t();
  }
- // or directly b = min(b_k,1); to be checked
  
  //  compute silhouette
  vec silhouette= (b-a)/arma::max(a,b);
@@ -352,18 +347,19 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
  // compute average silhouette per cluster
  vec silhouette_average(K);
  silhouette_average.fill(datum::nan);
- Y_motifs -= 1;
  for (int k = 0; k < K; k++) { 
-   uvec indices = arma::find(Y_motifs == k);
-   vec silhouette_k = silhouette.elem(indices);
-   uvec sorted_indeces = sort_index(silhouette_k, "descend");
+   const uvec & indices = find(Y_motifs == k + 1);
+   const vec & silhouette_k = silhouette.elem(indices);
+   const uvec & sorted_indeces = sort_index(silhouette_k, "descend");
    uvec curves_in_motifs_k = curves_in_motifs[k];
    curves_in_motifs_k = curves_in_motifs_k.elem(sorted_indeces);
    curves_in_motifs_k += 1;
    curves_in_motifs[k] = wrap(curves_in_motifs_k);
    silhouette.elem(indices) = arma::sort(silhouette_k, "descend");
-   silhouette_average(k) = arma::mean(silhouette_k);
+   silhouette_average(k) = mean(silhouette_k);
  }
  
- return List::create(silhouette,silhouette_average,curves_in_motifs,Y_motifs);
+ return List::create(silhouette,Y_motifs,curves_in_motifs,silhouette_average);
+ 
 }
+// cambiare ancora qualche lista, risolvere warning per i tipi 
