@@ -11,6 +11,107 @@ using namespace arma;
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::plugins(cpp20)]]
 
+IntegerVector myseq(int first, int last);
+
+// [[Rcpp::export]]
+NumericVector find_diss(const List &y,const List &v,  
+                        const vec & w, double alpha, unsigned int c_k,
+                        unsigned int d,bool use0,bool use1)
+{
+  Function domain(".domain");
+  Function select_domain(".select_domain");
+  Function diss_d0_d1_L2(".diss_d0_d1_L2");
+  
+  // Convert domain and select_domain
+  LogicalVector v_dom = as<LogicalVector>(domain(v,use0));
+  Rcpp::List v_new = select_domain(v, v_dom, use0, use1);
+  int v_len = v_dom.size();
+  int y_len = as<mat>(y[0]).n_rows;
+  IntegerVector s_rep = myseq(1 - (v_len - c_k), y_len - v_len + 1 + (v_len - c_k));
+  std::size_t s_rep_size = s_rep.size();
+  List y_rep(s_rep_size);
+  
+  // Convert y[0] and y[1] to mat objects
+  const int index_size = v_len;
+  mat temp_y0, temp_y1;
+  if (use0) {
+    temp_y0 = as<mat>(y[0]);
+  }
+  if (use1) {
+    temp_y1 = as<mat>(y[1]);
+  }
+  auto index_range = std::views::iota(0,index_size);
+  
+  for (unsigned int i = 0; i < s_rep_size; ++i) {
+    IntegerVector index = s_rep[i] - 1 + seq_len(v_len);
+    List y_rep_i = List::create(Named("y0") = R_NilValue, Named("y1") = R_NilValue);
+    auto j_true = index_range
+      | std::views::filter([&index,&y_len](int j){return((index[j] > 0) && (index[j] <= y_len));});
+    if (use0) {
+      mat new_y0(index_size, d);
+      new_y0.fill(datum::nan);
+      std::for_each(j_true.begin(),j_true.end(),[&new_y0,&temp_y0,&index](int j){new_y0.row(j) = temp_y0.row(index[j] - 1);});
+      y_rep_i["y0"] = new_y0;
+    }
+    if (use1) {
+      mat new_y1(index_size, d);
+      new_y1.fill(datum::nan);
+      std::for_each(j_true.begin(),j_true.end(),[&new_y1,&temp_y1,&index](int j){new_y1.row(j) = temp_y1.row(index[j] - 1);});
+      y_rep_i["y1"] = new_y1;
+    }
+    y_rep_i = select_domain(y_rep_i, v_dom, use0, use1);
+    y_rep[i] = y_rep_i;
+  }
+  const unsigned int y_rep_size = y_rep.size();
+  IntegerVector length_inter(y_rep_size);
+  
+  mat temp_y;
+  int i = 0;
+  for (const Rcpp::List& y_rep_i : y_rep) { // risolvere warning
+    if (use0) 
+      temp_y = as<mat>(y_rep_i["y0"]);
+    else
+      temp_y = as<mat>(y_rep_i["y1"]);
+    uvec non_na_indices = find_nan(temp_y.col(0)); 
+    length_inter[i] = temp_y.col(0).n_elem - non_na_indices.n_elem;
+    ++i;
+  }
+  
+  LogicalVector valid = length_inter >= c_k;
+  if (sum(valid) == 0) {        
+    valid[length_inter == max(length_inter)] = true;  // valid[which_max(length_inter)] = true;
+  }
+  
+  s_rep = s_rep[valid];
+  y_rep = y_rep[valid];
+  
+  NumericVector d_rep(y_rep_size);
+  
+  double min_d = std::numeric_limits<double>::max();
+  int min_s = 0;
+  
+  for (unsigned int i = 0; i < y_rep_size; i++) {
+    double dist = as<double>(diss_d0_d1_L2(y_rep[i], v_new, w, alpha));
+    d_rep[i] = dist;
+    if (dist < min_d){
+      min_d = dist;
+      min_s = s_rep[i];
+    }
+  }
+  return NumericVector::create(min_s, min_d); 
+}
+
+IntegerVector myseq(int first, int last) {
+  IntegerVector y(abs(last - first) + 1);
+  if (first < last) 
+    std::iota(y.begin(), y.end(), first);
+  else {
+    std::iota(y.begin(), y.end(), last);
+    std::reverse(y.begin(), y.end());
+  }
+  return y;
+}
+
 template<typename T>
 decltype(auto) combn2(const T & y){ 
   int n = y.n_elem;
@@ -65,7 +166,7 @@ T repLem(const T & v,
   std::size_t times_size = times.size();
   // check times_size == v.size()
   for (std::size_t i = 0; i < times_size; ++i) 
-    for (std::size_t j = 0; j < times[i]; ++j)
+    for (ivec::value_type j = 0; j < times[i]; ++j)
       result(k++) = v(i);
   return result;
 }
@@ -73,7 +174,6 @@ T repLem(const T & v,
 // [[Rcpp::export]]
 List probKMA_silhouette_rcpp(const List & probKMA_results,
                              bool align){ // @TODO = set to FALSE by default
-  // da ripensare con un qualche sorting su P_clean
   double alpha;
   bool use0, use1;
   unsigned int Y_size;
@@ -132,15 +232,14 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
   const List & first_y = Y[0];
   const mat & first_y0 = use0 ? as<mat>(first_y[0]) : as<mat>(first_y[1]); 
   const unsigned int d = first_y0.n_cols;
-  const unsigned int N = first_y0.n_rows;
+  //const unsigned int N = first_y0.n_rows;
   const unsigned int K = probKMA_results["K"];
   const List & motifs = use0 ? probKMA_results["V0"] : probKMA_results["V1"];
   
-  std::vector<uvec> V_dom(K); // each element will be an uvec
+  std::vector<uvec> V_dom(K); 
   ivec V_length(K);
-  unsigned int i = 0;
-  unsigned int j;
   
+  unsigned int j;
   // V_dom for each centroid contains an uvec with 0 if all the elements of the row of the centroid are NA
   for(unsigned int i = 0; i < K; ++i){
     const mat & v = motifs[i];
@@ -154,38 +253,38 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
  
  // extract pieces of curves that fall in the different motifs
  const imat & P_clean = probKMA_results["P_clean"];
- List curves_in_motifs(P_clean.n_cols); //TODO: change List
+ std::vector<uvec> curves_in_motifs(P_clean.n_cols); 
  for (unsigned int k = 0; k < P_clean.n_cols; ++k) {
    const ivec & P_clean_k = P_clean.col(k);
    const uvec & P_clean_1 = find(P_clean_k == 1); // to check in case 1 doesn't exist in the col
    curves_in_motifs[k] = P_clean_1;
  }
  
+ // TODO: I don't understed what it does
  // if(!is.null(ncol(curves_in_motifs))) this if condition makes no sense since curves_in_motifs is a list
  //   curves_in_motifs=split(curves_in_motifs,rep(seq_len(ncol(curves_in_motifs)),each=nrow(curves_in_motifs))) to be implemented and understood
  
  const ivec & curves_in_motifs_number=sum(P_clean,0).t();
  
+ // for each centroid take the shift of the curve associated to that centroid 
  const imat & S_clean = probKMA_results["S_clean"];
- List S_clean_k(S_clean.n_cols); // TODO: change List
+ std::vector<ivec> S_clean_k(S_clean.n_cols);
  for (unsigned int k=0; k < S_clean.n_cols; ++k){
   const ivec & col_S_clean = S_clean.col(k);
-  const uvec & curves_in_motifs_k = curves_in_motifs[k];
-  const ivec & indexed_S_clean = col_S_clean.elem(curves_in_motifs_k);
-  S_clean_k[k] = indexed_S_clean;
+  S_clean_k[k] = col_S_clean.elem(curves_in_motifs[k]);
  }
  
  // compute distances between pieces of curves
- List Y_in_motifs; // TODO : initialize size
- for (unsigned int i= 0; i < K; ++i){
+ std::vector<List> Y_in_motifs(Y_size);
+ unsigned int l = 0;
+ for (unsigned int i= 0; i < K; ++i){ // for each centroid
    const uvec & curves_in_motif = curves_in_motifs[i];
-   const ivec & s_k = S_clean_k[i];
    const uvec & v_dom = V_dom[i];
-   for(unsigned int j = 0; j < curves_in_motif.n_elem; ++j){
-     const List & y = Y[curves_in_motif[j]];
-     const int s = s_k[j];
+   for(unsigned int j = 0; j < curves_in_motif.n_elem; ++j){ // for each curve assigned to that centroid
+     const List & y = Y[curves_in_motif[j]]; //select the shifted part of the curve
+     const int s = S_clean_k[i][j];
      List y_temp = List::create(_["y0"] = R_NilValue,_["y1"] = R_NilValue);
-     const ivec & index = regspace<ivec>(1,v_dom.n_elem - std::max(0,1-s)) + std::max(1,s) - 1;
+     const uvec & index = regspace<uvec>(1,v_dom.n_elem - std::max(0,1-s)) + std::max(1,s) - 1;
      int index_size = index.n_elem;
      if (use0){
        const mat & y0 = as<mat>(y["y0"]);
@@ -195,9 +294,8 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
        y0_temp.fill(datum::nan);
        auto filtered_j = std::views::iota(0,index_size) 
          | std::views::filter([&y_len,&v_dom, &index](int j){return (index[j] <= y_len && v_dom(j));});
-       for(int j : filtered_j)
+       for(int j : filtered_j) // maybe to use submatrix
          y0_temp.row(std::max(0,1-s) + j) =  y0.row(index[j] - 1);
-       // $y0_temp[!v_dom,]=NA is the reason of v_dom(j)
        y_temp["y0"] = y0_temp;
      }
      if (use1) {
@@ -210,10 +308,9 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
          | std::views::filter([&y_len,&v_dom, &index](int j){return (index[j] <= y_len && v_dom(j));});
        for(int j : filtered_j)
          y1_temp.row(std::max(0,1-s) + j) =  y1.row(index[j] - 1);
-       // $y1_temp[!v_dom,]=NA is the reason of v_dom(j)
        y_temp["y1"] = y1_temp;
      }
-     Y_in_motifs.push_back(y_temp);
+     Y_in_motifs[l++] = y_temp;
    }
  }
  
@@ -235,56 +332,48 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
  const int YY_length_size = YY_lengths.n_cols;
  const ivec & YY_length_row0 = YY_lengths.row(0).t();
  const ivec & YY_length_row1 = YY_lengths.row(1).t();
- uvec swap = (YY_length_row0 < YY_length_row1); // const & to be add
+ const uvec & swap = (YY_length_row0 < YY_length_row1);
  const uvec & equal_length = (YY_length_row0 == YY_length_row1);
 
  auto filtered_j_swap = std::views::iota(0,YY_length_size) 
    | std::views::filter([&swap](int j){return swap(j);});
  
- // to use std::swap o alternatives, to be checked
  for (int j : filtered_j_swap){
    std::swap(indeces_YY(0,j),indeces_YY(1,j));
  }
  
- Function find_min_diss(".find_min_diss");
- Function find_diss(".find_diss");
+ Function find_diss_aligned(".find_diss"); // TODO : implement this function 
  
- // not checked the else condition 
- mat SD(2,YY_length_size);
+ vec SD(YY_length_size);
  
  if(align){
-   for(unsigned int i = 0; i < YY_length_size; ++i){
-     const List & yy0 = Y_in_motifs[indeces_YY(0,i)];
-     const List & yy1 = Y_in_motifs[indeces_YY(1,i)];
+   for(int i = 0; i < YY_length_size; ++i){
      bool equal_length_i = equal_length(i);
-     NumericVector min_diss_aligned = as<NumericVector>(find_diss(yy0,    
-                                                                  yy1,
-                                                                  alpha,
-                                                                  w,
-                                                                  equal_length_i,
-                                                                  d,
-                                                                  use0,
-                                                                  use1)); //use vec
-     SD(0,i) = min_diss_aligned[0]; // set col(i) with the above vec
-     SD(1,i) = min_diss_aligned[1];
+     NumericVector min_diss_aligned = as<NumericVector>(find_diss_aligned(Y_in_motifs[indeces_YY(0,i)],    
+                                                                          Y_in_motifs[indeces_YY(1,i)],
+                                                                          alpha,
+                                                                          w,
+                                                                          equal_length_i,
+                                                                          d,
+                                                                          use0,
+                                                                          use1)); 
+     SD(i) = min_diss_aligned[1];
    }
- }else{ //else condition to be checked
+ }else{ 
    imat c_Y_motifs_comb = combn2<ivec>(c_Y_motifs);  
-   for(unsigned int i = 0; i < YY_length_size; ++i){
-     const List & yy0 = Y_in_motifs[indeces_YY(0,i)];
-     const List & yy1 = Y_in_motifs[indeces_YY(1,i)];
+   for(int i = 0; i < YY_length_size; ++i){
      const unsigned int cc_motifs_i = std::min(c_Y_motifs_comb(0,i),
                                                c_Y_motifs_comb(1,i));
-     NumericVector min_diss = as<NumericVector>(find_min_diss(yy0,    
-                                                              yy1,
-                                                              alpha,
-                                                              w,
-                                                              cc_motifs_i,
-                                                              d,
-                                                              use0,
-                                                              use1)); //use vec
-     SD(0,i) = min_diss[0]; // set col(i) with the above vec
-     SD(1,i) = min_diss[1];
+     NumericVector min_diss = find_diss(Y_in_motifs[indeces_YY(0,i)],    
+                                        Y_in_motifs[indeces_YY(1,i)],
+                                        w,
+                                        alpha,
+                                        cc_motifs_i,
+                                        d,
+                                        use0,
+                                        use1);
+     
+     SD(i) = min_diss[1];
    }
   
  }
@@ -292,13 +381,13 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
  mat YY_D(Y_motifs_size,Y_motifs_size,fill::zeros);
  unsigned int k = 0;
  for (unsigned int j = 0; j < Y_motifs_size; ++j){
-   for (unsigned int i = j+1; i <  Y_motifs_size; ++i){
-     YY_D(i,j) = SD(1,k);
+   for (unsigned int i = j+1; i < Y_motifs_size; ++i){
+     YY_D(i,j) = SD(k);
      k++;
    }
  }
  
- YY_D = YY_D + YY_D.t(); // check: there is a clever way to make symmetric in arma
+ YY_D = YY_D + YY_D.t(); 
    
  // compute intra-cluster distances
  umat intra(Y_motifs_size,Y_motifs_size,fill::zeros);
@@ -337,7 +426,7 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
    b = b_k.t();
  }
  
- //  compute silhouette
+ // compute silhouette
  vec silhouette= (b-a)/arma::max(a,b);
  for(auto & sil : silhouette){ 
    if(!is_finite(sil))
@@ -347,14 +436,12 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
  // compute average silhouette per cluster
  vec silhouette_average(K);
  silhouette_average.fill(datum::nan);
- for (int k = 0; k < K; k++) { 
+ for (unsigned int k = 0; k < K; k++) { 
    const uvec & indices = find(Y_motifs == k + 1);
    const vec & silhouette_k = silhouette.elem(indices);
    const uvec & sorted_indeces = sort_index(silhouette_k, "descend");
-   uvec curves_in_motifs_k = curves_in_motifs[k];
-   curves_in_motifs_k = curves_in_motifs_k.elem(sorted_indeces);
-   curves_in_motifs_k += 1;
-   curves_in_motifs[k] = wrap(curves_in_motifs_k);
+   curves_in_motifs[k] = curves_in_motifs[k].elem(sorted_indeces);
+   curves_in_motifs[k] += 1;
    silhouette.elem(indices) = arma::sort(silhouette_k, "descend");
    silhouette_average(k) = mean(silhouette_k);
  }
@@ -362,4 +449,3 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
  return List::create(silhouette,Y_motifs,curves_in_motifs,silhouette_average);
  
 }
-// cambiare ancora qualche lista, risolvere warning per i tipi 
