@@ -14,6 +14,82 @@ using namespace arma;
 IntegerVector myseq(int first, int last);
 
 // [[Rcpp::export]]
+NumericVector find_diss_aligned_rcpp(const List &y,
+                                     const List &v,  
+                                     const vec & w, 
+                                     double alpha,
+                                     bool aligned,
+                                     unsigned int d,
+                                     bool use0,
+                                     bool use1)
+{
+  Function domain(".domain");
+  Function select_domain(".select_domain");
+  Function diss_d0_d1_L2(".diss_d0_d1_L2");
+  
+  LogicalVector v_dom = as<LogicalVector>(domain(v,use0));
+  Rcpp::List v_new = select_domain(v, v_dom, use0, use1);
+  int v_len = v_dom.size();
+  int y_len = as<mat>(y[0]).n_rows;
+  IntegerVector s_rep;
+  if (aligned){
+    s_rep = 1;
+  } else {
+    s_rep = myseq(1, y_len - v_len + 1);
+  }
+  std::size_t s_rep_size = s_rep.size();
+  List y_rep(s_rep_size);
+  
+  // Convert y[0] and y[1] to mat objects
+  const int index_size = v_len;
+  mat temp_y0, temp_y1;
+  if (use0) {
+    temp_y0 = as<mat>(y[0]);
+  }
+  if (use1) {
+    temp_y1 = as<mat>(y[1]);
+  }
+  
+  auto index_range = std::views::iota(0,index_size);
+  
+  for (unsigned int i = 0; i < s_rep_size; ++i) {
+    IntegerVector index = s_rep[i] - 1 + myseq(1,v_len);
+    List y_rep_i = List::create(Named("y0") = R_NilValue, Named("y1") = R_NilValue);
+    auto j_true = index_range
+      | std::views::filter([&index,&y_len](int j){return((index[j] > 0) && (index[j] <= y_len));});
+    if (use0) {
+      mat new_y0(index_size, d);
+      new_y0.fill(datum::nan);
+      std::for_each(j_true.begin(),j_true.end(),[&new_y0,&temp_y0,&index](int j){new_y0.row(j) = temp_y0.row(index[j] - 1);});
+      y_rep_i["y0"] = new_y0;
+    }
+    if (use1) {
+      mat new_y1(index_size, d);
+      new_y1.fill(datum::nan);
+      std::for_each(j_true.begin(),j_true.end(),[&new_y1,&temp_y1,&index](int j){new_y1.row(j) = temp_y1.row(index[j] - 1);});
+      y_rep_i["y1"] = new_y1;
+      }
+    y_rep_i = select_domain(y_rep_i, v_dom, use0, use1);
+    y_rep[i] = y_rep_i;
+    }
+  
+  NumericVector d_rep(s_rep_size);
+  
+  double min_d = std::numeric_limits<double>::max();
+  int min_s = 0;
+  
+  for (unsigned int i = 0; i < s_rep_size; i++) {
+    double dist = as<double>(diss_d0_d1_L2(y_rep[i], v_new, w, alpha));
+    d_rep[i] = dist;
+    if (dist < min_d){
+      min_d = dist;
+      min_s = s_rep[i];
+    }
+  }
+  return NumericVector::create(min_s, min_d); 
+}
+  
+// [[Rcpp::export]]
 NumericVector find_diss(const List &y,const List &v,  
                         const vec & w, double alpha, unsigned int c_k,
                         unsigned int d,bool use0,bool use1)
@@ -67,7 +143,7 @@ NumericVector find_diss(const List &y,const List &v,
   
   mat temp_y;
   int i = 0;
-  for (const Rcpp::List& y_rep_i : y_rep) { // risolvere warning
+  for (const Rcpp::List& y_rep_i : y_rep) { // TODO: risolvere warning
     if (use0) 
       temp_y = as<mat>(y_rep_i["y0"]);
     else
@@ -79,18 +155,19 @@ NumericVector find_diss(const List &y,const List &v,
   
   LogicalVector valid = length_inter >= c_k;
   if (sum(valid) == 0) {        
-    valid[length_inter == max(length_inter)] = true;  // valid[which_max(length_inter)] = true;
+    valid[length_inter == max(length_inter)] = true; 
   }
   
   s_rep = s_rep[valid];
   y_rep = y_rep[valid];
   
-  NumericVector d_rep(y_rep_size);
+  const unsigned int y_rep_size_valid = y_rep.size(); // TODO: aggiornare dimensione di y_rep
+  NumericVector d_rep(y_rep_size_valid);
   
   double min_d = std::numeric_limits<double>::max();
   int min_s = 0;
   
-  for (unsigned int i = 0; i < y_rep_size; i++) {
+  for (unsigned int i = 0; i < y_rep_size_valid; i++) {
     double dist = as<double>(diss_d0_d1_L2(y_rep[i], v_new, w, alpha));
     d_rep[i] = dist;
     if (dist < min_d){
@@ -342,23 +419,25 @@ List probKMA_silhouette_rcpp(const List & probKMA_results,
    std::swap(indeces_YY(0,j),indeces_YY(1,j));
  }
  
- Function find_diss_aligned(".find_diss"); // TODO : implement this function 
- 
  vec SD(YY_length_size);
  
  if(align){
+   
    for(int i = 0; i < YY_length_size; ++i){
+     
      bool equal_length_i = equal_length(i);
-     NumericVector min_diss_aligned = as<NumericVector>(find_diss_aligned(Y_in_motifs[indeces_YY(0,i)],    
-                                                                          Y_in_motifs[indeces_YY(1,i)],
-                                                                          alpha,
-                                                                          w,
-                                                                          equal_length_i,
-                                                                          d,
-                                                                          use0,
-                                                                          use1)); 
+     
+     NumericVector min_diss_aligned = find_diss_aligned_rcpp(Y_in_motifs[indeces_YY(0,i)],    
+                                                             Y_in_motifs[indeces_YY(1,i)],
+                                                             w,
+                                                             alpha,
+                                                             equal_length_i,
+                                                             d,
+                                                             use0,
+                                                             use1); 
+                                                             
      SD(i) = min_diss_aligned[1];
-   }
+  }
  }else{ 
    imat c_Y_motifs_comb = combn2<ivec>(c_Y_motifs);  
    for(int i = 0; i < YY_length_size; ++i){
