@@ -22,7 +22,8 @@ NumericVector find_diss_aligned_rcpp(const List &y,
                                      unsigned int d,
                                      bool use0,
                                      bool use1)
-{
+{ 
+  int i = 0;
   Function domain(".domain");
   Function select_domain(".select_domain");
   Function diss_d0_d1_L2(".diss_d0_d1_L2");
