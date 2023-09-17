@@ -12,7 +12,7 @@ using namespace arma;
 
 
 // [[Rcpp::export]]
-arma::mat find_occurrences(const Rcpp::List& v,
+arma::mat find_occurrences_cpp(const Rcpp::List& v,
                            const Rcpp::List& Y,
                            const double R,
                            const double alpha,
