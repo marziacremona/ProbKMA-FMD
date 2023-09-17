@@ -6,18 +6,20 @@ using namespace arma;
 #include <vector>
 #include <ranges>
 #include <algorithm>
+#include <gperftools/profiler.h>
+
 
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::plugins(cpp20)]]
 
-List repeat_elements(const imat& A,const ivec & times) {
-  uword times_size = times.n_elem;
+List repeat_elements(const arma::imat& A,const arma::ivec & times) {
+  arma::uword times_size = times.n_elem;
   List result((times_size*(times_size+1))/2 - 1);
   std::size_t i = 0;
-  for(uword j = 0;j < times_size;++j)
+  for(arma::uword j = 0;j < times_size;++j)
   {
-    const imat& B = repmat(A.col(j),1,times[j]);
-    B.each_col([&result,&i](const ivec& v){result[i++] = v;});
+    const arma::imat& B = repmat(A.col(j),1,times[j]);
+    B.each_col([&result,&i](const arma::ivec& v){result[i++] = v;});
   }
   return result;
 }
@@ -25,11 +27,11 @@ List repeat_elements(const imat& A,const ivec & times) {
 
 
 double compute_Jk_rcpp(const List & v,
-                       const ivec & s_k,
-                       const vec & p_k,
+                       const arma::ivec & s_k,
+                       const arma::vec & p_k,
                        const List & Y,
                        double alpha,
-                       const vec & w,
+                       const arma::vec & w,
                        int m,
                        bool use0,
                        bool use1,
@@ -41,7 +43,7 @@ double compute_Jk_rcpp(const List & v,
   Function diss_d0_d1_L2(".diss_d0_d1_L2");
   
   // domain of the centroid
-  // uvec non gli piacciono a select_domain 
+  // arma::uvec non gli piacciono a select_domain 
   LogicalVector v_dom = as<LogicalVector>(domain(v,use0));
   
   // length of the domain
@@ -51,7 +53,7 @@ double compute_Jk_rcpp(const List & v,
   List v_new = select_domain(v, v_dom, use0, use1);
   
   const List& first_y = Y[0]; // Y is list of list, first_y is the first list, first_y[0] is the first list of first_y 
-  const mat& first_y0 = use0 ? as<mat>(first_y[0]):as<mat>(first_y[1]);
+  const arma::mat& first_y0 = use0 ? as<arma::mat>(first_y[0]):as<arma::mat>(first_y[1]);
   
   // dimensionality of the curves
   const unsigned int d = first_y0.n_cols;
@@ -67,13 +69,13 @@ double compute_Jk_rcpp(const List & v,
     List y_inters_k = List::create(Named("y0") = R_NilValue,
                                    Named("y1") = R_NilValue);
     const int& s_k_i = s_k[i];
-    const ivec& index = regspace<ivec>(1, v_len - std::max(0, 1-s_k_i)) + std::max(1,s_k_i) - 1;
+    const arma::ivec& index = regspace<arma::ivec>(1, v_len - std::max(0, 1-s_k_i)) + std::max(1,s_k_i) - 1;
     int index_size = index.size();
     const List& y_i = Y[i];
     
-    mat new_y01(index_size + std::max(0, 1-s_k_i), d);
+    arma::mat new_y01(index_size + std::max(0, 1-s_k_i), d);
     if (use0){
-      const mat& temp_y0_i = as<mat>(y_i[0]);
+      const arma::mat& temp_y0_i = as<arma::mat>(y_i[0]);
       new_y01.fill(datum::nan);
       
       auto filtered_j = std::views::iota(0,index_size)
@@ -85,7 +87,7 @@ double compute_Jk_rcpp(const List & v,
     }
 
     if (use1){
-      const mat& temp_y1_i = as<mat>(y_i[1]);
+      const arma::mat& temp_y1_i = as<arma::mat>(y_i[1]);
       new_y01.fill(datum::nan);
       
       auto filtered_j = std::views::iota(0,index_size)
@@ -106,13 +108,13 @@ double compute_Jk_rcpp(const List & v,
     auto filtered_Y_inters = std::views::iota(0,Y.size()) 
         | std::views::filter([&keep_k_notnull](int j){return keep_k_notnull[j];})
         | std::views::transform([&Y_inters_k](int j){return Y_inters_k[j];});
-
+    ProfilerStart("myprof.log");
     NumericVector supp_inters_length(std::ranges::distance(filtered_Y_inters));
     for (unsigned int i = 0; auto y_filtered:filtered_Y_inters){
-      uvec domain_y_inters_k  = as<uvec>(domain(y_filtered,use0));
+      arma::uvec domain_y_inters_k  = as<arma::uvec>(domain(y_filtered,use0));
       supp_inters_length[i++] = sum(domain_y_inters_k);
     }
-    
+    ProfilerStop();
     int c_k_notnull = as<int>(c_k);
     LogicalVector check_lengths = supp_inters_length < c_k_notnull;
     
@@ -120,7 +122,7 @@ double compute_Jk_rcpp(const List & v,
   }
   
   vec dist(Y_size);
-  for (uword i = 0; i < Y_size; ++i)
+  for (arma::uword i = 0; i < Y_size; ++i)
   {
     dist[i] = as<double>(diss_d0_d1_L2(Y_inters_k[i], v_new, w, alpha));
   }
@@ -132,11 +134,11 @@ double compute_Jk_rcpp(const List & v,
 
 // [[Rcpp::export]]
 List elongation_rcpp(const List & v_new_k, 
-                     const uvec& v_dom_k,  
-                     const ivec& s_k, 
+                     const arma::uvec& v_dom_k,  
+                     const arma::ivec& s_k, 
                      const vec & p_k, 
-                     const ivec& len_elong_k, 
-                     const uvec& keep_k,  
+                     const arma::ivec& len_elong_k, 
+                     const arma::uvec& keep_k,  
                      double c, 
                      const Function& domain,
                      const Function& compute_motif,
@@ -152,19 +154,19 @@ List elongation_rcpp(const List & v_new_k,
   }
   
   // new vec with zero at the top
-  ivec len_elong_k_zero(len_elong_k.size() + 1, fill::zeros);
+  arma::ivec len_elong_k_zero(len_elong_k.size() + 1, fill::zeros);
   std::copy(len_elong_k.begin(), len_elong_k.end(), len_elong_k_zero.begin() + 1);
   
   // create a matrix whose column_i contains the vector s_k - len_elong_k_zero[i]
-  uword len_elong_k_zero_size = len_elong_k_zero.size();
-  imat s_k_elong_left_right_temp(s_k.n_elem, len_elong_k_zero_size);
+  arma::uword len_elong_k_zero_size = len_elong_k_zero.size();
+  arma::imat s_k_elong_left_right_temp(s_k.n_elem, len_elong_k_zero_size);
   
-  for (uword i=0; i < len_elong_k_zero_size;++i) {
+  for (arma::uword i=0; i < len_elong_k_zero_size;++i) {
     s_k_elong_left_right_temp.col(i) = s_k - len_elong_k_zero(i);
   }
   
   // create a sequence of integer from len_elong_k_zero.size() to 1
-  ivec reversedSequence = regspace<ivec>(len_elong_k_zero_size,-1,1);
+  arma::ivec reversedSequence = arma::regspace<arma::ivec>(len_elong_k_zero_size,-1,1);
   reversedSequence(0) -= 1;
   
   // repeat each col of s_k_elong_left_right a number of times specified by reversedSequence and return a list 
@@ -177,11 +179,11 @@ List elongation_rcpp(const List & v_new_k,
   
   for(std::size_t i = 0;const int len_elong_k_left:len_elong_k_zero)
   {
-    uvec temp(len_elong_k_left + v_dom_k_len + len_elong_k_zero[max_len_elong_k],fill::ones);
+    arma::uvec temp(len_elong_k_left + v_dom_k_len + len_elong_k_zero[max_len_elong_k],fill::ones);
     std::copy(v_dom_k.begin(), v_dom_k.end(), temp.begin() + len_elong_k_left);
     for(unsigned int j = 0; j < max_len_elong_k+1;++j)
     {
-      const uvec& temp_subwiew = temp(regspace<uvec>(0,1,len_elong_k_left + v_dom_k_len + len_elong_k_zero[j]-1)); 
+      const arma::uvec& temp_subwiew = temp(regspace<arma::uvec>(0,1,len_elong_k_left + v_dom_k_len + len_elong_k_zero[j]-1)); 
       v_dom_elong_left_right[i++] = temp_subwiew;
     }
     --max_len_elong_k;
@@ -221,18 +223,18 @@ List elongation_rcpp(const List & v_new_k,
   vec c_k_after(v_elong_left_right_size);
   vec Jk_after(v_elong_left_right_size);
   
-  for (uword i = 0; i < v_elong_left_right_size; i++) {
-    const uvec& domain_elong = as<uvec>(domain(v_elong_left_right[i], use0));
+  for (arma::uword i = 0; i < v_elong_left_right_size; i++) {
+    const arma::uvec& domain_elong = as<arma::uvec>(domain(v_elong_left_right[i], use0));
     int c_i =  std::max(floor(domain_elong.n_elem*(1 - max_gap)),c); 
     c_k_after[i] = c_i; // avoid if, next line
     const List& v_i = v_elong_left_right[i];
-    const ivec& s_i = s_k_elong_left_right[i];
+    const arma::ivec& s_i = s_k_elong_left_right[i];
     Jk_after[i] = compute_Jk_rcpp(v_i, s_i, p_k, Y, alpha, w, m,use0 , use1,wrap(c_i),as<LogicalVector>(wrap(keep_k)));
   }
 
   // find the best elongation in terms of perf. index
   vec diff_perc = ((Jk_after-Jk_before)/Jk_before);
-  uword best_elong = index_min(diff_perc);
+  arma::uword best_elong = index_min(diff_perc);
 
   // check that the min really exists
   bool elongate = false;

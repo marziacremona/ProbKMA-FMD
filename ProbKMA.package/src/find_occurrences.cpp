@@ -28,9 +28,9 @@ arma::mat find_occurrences(const Rcpp::List& v,
   std::size_t v_len = v_dom.size();
   arma::mat SD_motif(Y.size(),2);
   std::list<uword> index_list;
-  const List& temp_domain = select_domain(v,v_dom,use0,use1);
+  const List& temp_domain = select_domain(v,Rcpp::as<Rcpp::LogicalVector>(wrap(v_dom)),use0,use1);
   int t = 0;
-  for(int i = 0,z = 0;i < Y.size();++i)
+  for(int i = 0,z = 1;i < Y.size();++i)
   {
     const List& Y_i = Y[i];
     std::size_t y_len = as<mat>(Y_i[0]).n_rows;
@@ -40,14 +40,12 @@ arma::mat find_occurrences(const Rcpp::List& v,
     {
       arma::mat y0;
       arma::mat y1;
-      uvec index = regspace<uvec>(0,v_len-1);
-      index = index + i - 1;
       if(use0)
-        y0 = arma::conv_to<mat>::from(as<mat>(Y_i[0]).rows(i,v_len-1+i));
+        y0 = arma::conv_to<mat>::from(as<mat>(Y_i[0]).rows(j,v_len-1+j));
       if(use1)
-        y1 = arma::conv_to<mat>::from(as<mat>(Y_i[1]).rows(i,v_len-1+i));
+        y1 = arma::conv_to<mat>::from(as<mat>(Y_i[1]).rows(j,v_len-1+j));
       
-      y_rep[j] = select_domain(List::create(Named("y0") = y0,Named("y1") = y1),v_dom,use0,use1);
+      y_rep[j] = select_domain(List::create(Named("y0") = y0,Named("y1") = y1),Rcpp::as<Rcpp::LogicalVector>(wrap(v_dom)),use0,use1);
     }
     NumericVector valid; // TODO: da cambiare
     for(int k = 0;k<y_rep.size();++k)
@@ -59,18 +57,17 @@ arma::mat find_occurrences(const Rcpp::List& v,
     y_rep = y_rep[valid];
     vec d_rep(y_rep.size());
     for(int k = 0;k<y_rep.size();++k)
-      d_rep = as<vec>(diss_d0_d1_L2(y_rep[k],temp_domain,w,alpha));
+      d_rep[k] = as<double>(diss_d0_d1_L2(y_rep[k],temp_domain,w,alpha));
     
     uvec d_rep_R(d_rep.size()+2,fill::zeros);
     const uvec logic = d_rep <= R;
     std::copy(logic.begin(),logic.end(),d_rep_R.begin()+1);
-    uvec diff_d_rep_R = diff(d_rep_R);
-    
+    ivec diff_d_rep_R = conv_to<ivec>::from(diff(d_rep_R));
     uvec start = find(diff_d_rep_R==1);
     uvec end = find(diff_d_rep_R == -1) - 1;
-    for(int k = 0;k<start.size();++k)
+    for(int k = 0;k<std::min(start.size(),end.size());++k) // NON SO SE SERVE STD::min NEL CASO GENERALE
     {
-      const uvec& temp_d_rep = arma::conv_to<uvec>::from(d_rep(span(start[k],end[k]))); 
+      const vec& temp_d_rep = arma::conv_to<vec>::from(d_rep(span(start[k],end[k]))); 
       uword index = index_min(temp_d_rep);
       index = index + start[k];
       if(!start.empty() && !end.empty())
@@ -79,8 +76,8 @@ arma::mat find_occurrences(const Rcpp::List& v,
         SD_motif(t,0) = s_rep[index];
         SD_motif(t++,1) = d_rep[index]; 
       }
-      ++z;
     }
+    ++z;
   }
   if(!SD_motif.empty())
   {
@@ -89,7 +86,7 @@ arma::mat find_occurrences(const Rcpp::List& v,
     int i = 0;
     for(auto it = index_list.begin();it != index_list.end();++it)
       B(i++,0) = *it;
-    SD_motif = join_horiz(SD_motif,B);
+    SD_motif = join_horiz(B,SD_motif);
     return SD_motif;
   }
   else

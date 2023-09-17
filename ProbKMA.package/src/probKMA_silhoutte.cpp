@@ -90,7 +90,6 @@ NumericVector find_diss_aligned_rcpp(const List &y,
   return NumericVector::create(min_s, min_d); 
 }
   
-// [[Rcpp::export]]
 NumericVector find_diss(const List &y,const List &v,  
                         const vec & w, double alpha, unsigned int c_k,
                         unsigned int d,bool use0,bool use1)
