@@ -18,17 +18,13 @@ using namespace arma;
 IntegerVector myseq(int first, int last);
 
 // [[Rcpp::export]]
-NumericVector find_diss_rcpp(const List &y,const List &v,  
-                            unsigned int c_k,
-                            const NumericVector & w, 
-                            double alpha, 
-                            unsigned int d,bool use0,bool use1,
-                            const Function & domain, 
-                            const Function & select_domain,
-                            const Function & diss_d0_d1_L2)
+NumericVector find_diss(const List &y,const List &v,  
+                        const NumericVector & w, double alpha, unsigned int c_k,
+                        unsigned int d,bool use0,bool use1,
+                        const Function & domain, 
+                        const Function & select_domain,
+                        const Function & diss_d0_d1_L2)
 {
-  // Rcout << "ciao sono dentro " << std::endl;
-  
   // Convert domain and select_domain
   LogicalVector v_dom = as<LogicalVector>(domain(v,use0));
   Rcpp::List v_new = select_domain(v, v_dom, use0, use1);
@@ -92,16 +88,14 @@ NumericVector find_diss_rcpp(const List &y,const List &v,
   s_rep = s_rep[valid];
   y_rep = y_rep[valid];
   
-  const unsigned int y_rep_size_new = y_rep.size();
-    
-  //NumericVector d_rep(y_rep_size_new);
+  NumericVector d_rep(y_rep_size);
   
   double min_d = std::numeric_limits<double>::max();
   int min_s = 0;
   
-  for (int i = 0; i < y_rep_size_new; i++) {
+  for (int i = 0; i < y_rep_size; i++) {
     double dist = as<double>(diss_d0_d1_L2(y_rep[i], v_new, w, alpha));
-    //d_rep[i] = dist;
+    d_rep[i] = dist;
     if (dist < min_d){
       min_d = dist;
       min_s = s_rep[i];
