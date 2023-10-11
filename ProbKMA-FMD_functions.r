@@ -2426,7 +2426,7 @@ motifs_search <- function(cluster_candidate_motifs_results,
     select=c()
     for(i_hclust in seq_len(n_hclust)){
       index_i=which(V_hclust==i_hclust) # motifs in cluster i
-      V_D_i=as.matrix(filter_candidate_motifs_results$D_clean[,index_i])
+      V_D_i=as.matrix(cluster_candidate_motifs_results$D_clean[,index_i])
       
       V_frequencies_approx_i=colSums(V_D_i<=R_m[i_hclust]) # approximate frequency 
       V_mean_diss_approx_i=apply(V_D_i,2,function(x) mean(x[x<=R_m[i_hclust]])) # approximate average distance (actual radius)
