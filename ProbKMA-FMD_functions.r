@@ -2305,7 +2305,7 @@ motifs_search <- function(cluster_candidate_motifs_results,
   }else{
     cl_search=NULL
   }
-
+  
   ### prepare input data ##################################################################################
   if(cluster_candidate_motifs_results$diss=='d0_L2'){
     alpha=0
@@ -2429,7 +2429,7 @@ motifs_search <- function(cluster_candidate_motifs_results,
     select=c()
     for(i_hclust in seq_len(n_hclust)){
       index_i=which(V_hclust==i_hclust) # motifs in cluster i
-      V_D_i=as.matrix(filter_candidate_motifs_results$D_clean[,index_i])
+      V_D_i=as.matrix(cluster_candidate_motifs_results$D_clean[,index_i])
       
       V_frequencies_approx_i=colSums(V_D_i<=R_m[i_hclust]) # approximate frequency 
       V_mean_diss_approx_i=apply(V_D_i,2,function(x) mean(x[x<=R_m[i_hclust]])) # approximate average distance (actual radius)
@@ -2462,6 +2462,7 @@ motifs_search <- function(cluster_candidate_motifs_results,
     # find occurrences
     V_occurrences=.mapply_custom(cl_search,.find_occurrences,
                                  V,V_R_m,c_k,MoreArgs=list(Y=Y,alpha=alpha,w=w,use0,use1),SIMPLIFY=FALSE)
+    
     not_null=which(!unlist(lapply(V_occurrences,is.null)))
     V=V[not_null]
     V_occurrences=V_occurrences[not_null]
