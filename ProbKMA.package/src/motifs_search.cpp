@@ -1,12 +1,4 @@
-#include "RcppArmadillo.h"
-using namespace Rcpp;
-using namespace arma;
-#include <numeric>
-#include <vector>
-#include <ranges>
-#include <algorithm>
-#include <string>
-#include <list>
+#include "motifs_search.h"
 
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::plugins(cpp20)]]
@@ -35,143 +27,99 @@ public:
   }
 };
 
-template<typename T>
-vec avg_rank(const T& x)
+Rcpp::List motifs_search_cpp(const Rcpp::List& Y, // list of list of matrices
+                             const Rcpp::List& V,  // list of list of matrices 
+                             const Rcpp::List& V0_clean,
+                             const Rcpp::List& V1_clean,
+                             const Rcpp::List& V_dom, // list of LogicalVector
+                             const arma::vec& V_length, // vector of V_dom_i's length 
+                             const arma::mat& P_clean,
+                             const arma::mat& D_clean,
+                             arma::uvec V_hclust, //vector of indices related to clusters 
+                             const double alpha, 
+                             const bool use0, const bool use1,
+                             const arma::vec& w, 
+                             const arma::vec& c,
+                             const double max_gap,  
+                             const double d, // n_col of Y[[0]]
+                             const double N, // n_row of D
+                             const double K, // n_col of D
+                             const double R_all,
+                             const arma::vec& R_m,
+                             bool use_real_occurrences,
+                             double length_diff,
+                             Rcpp::Function diss_d0_d1_L2, 
+                             Rcpp::Function domain,
+                             Rcpp::Function select_domain) 
 {
-  R_xlen_t sz = x.size();
-  Rcpp::IntegerVector w = Rcpp::seq(0, sz - 1);
-  std::sort(w.begin(), w.end(), Comparator(x));
-  
-  vec r;
-  r.set_size(sz);
-  for (R_xlen_t n, i = 0; i < sz; i += n) {
-    n = 1;
-    while (i + n < sz && x[w[i]] == x[w[i + n]]) ++n;
-    for (R_xlen_t k = 0; k < n; k++) {
-      r[w[i + k]] = i + (n + 1) / 2.;
-    }
-  }
-  
-  return r;
-}
-
-template<typename V,typename T>
-T order2(const V& x, bool desc = false) {
-  std::size_t n = x.size();
-  T idx;
-  if constexpr(std::is_same<V, arma::uvec>::value)
-  {
-    idx.set_size(n); 
-  }
-  else
-  {
-    idx = T(n);
-  }
-  std::iota(idx.begin(), idx.end(), static_cast<size_t>(1));
-  if (desc) {
-    auto comparator = [&x](size_t a, size_t b){ return x[a - 1] > x[b - 1]; };
-    std::stable_sort(idx.begin(), idx.end(), comparator);
-  } else {
-    auto comparator = [&x](size_t a, size_t b){ return x[a - 1] < x[b - 1]; };
-    std::stable_sort(idx.begin(), idx.end(), comparator);
-    // simulate na.last
-    size_t nas = 0;
-    for (size_t i = 0; i < n; ++i, ++nas)
-      if (!Vector<REALSXP>::is_na(x[idx[i] - 1])) break;
-      std::rotate(idx.begin(), idx.begin() + nas, idx.end());
-  }
-  return idx;
-}
-
-
-// [[Rcpp::export]]
-List motifs_search_cpp(const List& Y, // list of list of matrices
-                   const List& V,  // list of list of matrices 
-                   const List& V0_clean,
-                   const List& V1_clean,
-                   const List& V_dom, // list of LogicalVector
-                   const vec& V_length, // vector of V_dom_i's length 
-                   const mat& P_clean,
-                   const mat& D_clean,
-                   uvec V_hclust, //vector of indices related to clusters 
-                   const double alpha, 
-                   const bool use0, const bool use1,
-                   const vec& w, 
-                   const vec& c,
-                   const double max_gap,  
-                   const double d, // n_col of Y[[0]]
-                   const double N, // n_row of D
-                   const double K, // n_col of D
-                   const double R_all,
-                   const vec& R_m,
-                   bool use_real_occurrences,
-                   double length_diff) 
-{
-  // transform index from R to c++
+  // transform index from R to C++
   unsigned int n_hclust = V_hclust.max();
   V_hclust -= 1;
   
   // prepare output data_structure
-  uvec select(n_hclust*V_hclust.size()); // TODO:C'è da controllare che select non sia nullo altrimenti è un vettore vuoto e quindi restituisco risultati nulli 
+  arma::uvec select(n_hclust*V_hclust.size()); // TODO:C'è da controllare che select non sia nullo altrimenti è un vettore vuoto e quindi restituisco risultati nulli 
   std::size_t V_size = V.size();
-  List V_final;
-  List V_occurrences(V_size);
-  vec V_length_final;
-  vec V_R_m;
-  NumericVector V_frequencies_final;
-  NumericVector V_mean_diss_final;
-  IntegerVector index_final;
-  Function find_occurrences_cpp("find_occurrences_cpp");
+  Rcpp::List V_final;
+  Rcpp::List V_occurrences(V_size);
+  arma::vec V_length_final;
+  arma::vec V_R_m;
+  Rcpp::NumericVector V_frequencies_final;
+  Rcpp::NumericVector V_mean_diss_final;
+  Rcpp::IntegerVector index_final;
   int count = 0;
 
   if (use_real_occurrences)
   {
-    uvec c_k = conv_to<uvec>::from(floor(V_length*(1-max_gap)));
-    uvec index = find(c_k < c);
-    std::for_each(index.begin(),index.end(),[&c_k,&c](uword i){c_k[i] = c[i];}); // provare togliere return
-    V_R_m = arma::conv_to<vec>::from(R_m.elem(V_hclust));
+    arma::uvec c_k = arma::conv_to<arma::uvec>::from(arma::floor(V_length*(1-max_gap)));
+    arma::uvec index = find(c_k < c);
+    std::for_each(index.begin(),index.end(),[&c_k,&c](arma::uword i){c_k[i] = c[i];}); // provare togliere return
+    V_R_m = arma::conv_to<arma::vec>::from(R_m.elem(V_hclust));
   
   // find occurrences
-    uvec not_null(V_size);
+    arma::uvec not_null(V_size);
     for(int i = 0; i < V_size;++i) // i am assuming that V_R_m has not necessary the same length of V and c_k
     {
       V_occurrences[i] = find_occurrences_cpp(V[i],Y,
                                           V_R_m[i],
                                           alpha,w,c_k[i], 
-                                          use0,use1); // return a list of matrix or empty vector c()
-      if(Nullable<mat>(V_occurrences[i]).isNotNull())
+                                          use0,use1,
+                                          diss_d0_d1_L2,
+                                          domain,
+                                          select_domain); // return a list of matrix or empty vector c()
+      
+      if(Rcpp::Nullable<arma::mat>(V_occurrences[i]).isNotNull())
         not_null[count++] = i;
     }
     not_null.resize(count); // resize the vector 
-    V_final = V[as<IntegerVector>(wrap(not_null))];
-    V_length_final = arma::conv_to<vec>::from(V_length.elem(not_null));
-    V_R_m = arma::conv_to<vec>::from(V_R_m.elem(not_null));
-    V_hclust = arma::conv_to<uvec>::from(V_hclust.elem(not_null));
+    V_final = V[Rcpp::as<Rcpp::IntegerVector>(Rcpp::wrap(not_null))];
+    V_length_final = arma::conv_to<arma::vec>::from(V_length.elem(not_null));
+    V_R_m = arma::conv_to<arma::vec>::from(V_R_m.elem(not_null));
+    V_hclust = arma::conv_to<arma::uvec>::from(V_hclust.elem(not_null));
   
     // select candidate motifs in each group
     count = 0;
     for(int i = 0;i < n_hclust;++i)
     {
-      uvec index_i = find(V_hclust==i);
+      arma::uvec index_i = arma::find(V_hclust==i);
       std::size_t index_i_size = index_i.size();
-      auto range_rows = index_i | std::views::transform([&V_occurrences](uword j)
-        {return as<mat>(V_occurrences[j]).n_rows;});
-      auto range_mean = index_i | std::views::transform([&V_occurrences](uword j)
-        {return mean(as<mat>(V_occurrences[j]).col(2));});
-      NumericVector V_frequencies_i(range_rows.begin(),range_rows.end());
-      NumericVector V_mean_diss_i(range_mean.begin(),range_mean.end());
+      auto range_rows = index_i | std::views::transform([&V_occurrences](arma::uword j)
+      {return as<arma::mat>(V_occurrences[j]).n_rows;});
+      auto range_mean = index_i | std::views::transform([&V_occurrences](arma::uword j)
+      {return mean(as<arma::mat>(V_occurrences[j]).col(2));});
+      Rcpp::NumericVector V_frequencies_i(range_rows.begin(),range_rows.end());
+      Rcpp::NumericVector V_mean_diss_i(range_mean.begin(),range_mean.end());
 
       // order based of frequency and average distanceà
-      const vec& avgR = avg_rank(-1 * V_frequencies_i)+avg_rank(V_mean_diss_i);
-      IntegerVector V_order_i = order2<vec,IntegerVector>(avgR) - 1;
+      const arma::vec& avgR = util::avg_rank<Rcpp::NumericVector,Comparator<Rcpp::NumericVector>>(-1 * V_frequencies_i)+util::avg_rank<Rcpp::NumericVector,Comparator<Rcpp::NumericVector>>(V_mean_diss_i);
+      Rcpp::IntegerVector V_order_i = util::order2<arma::vec,Rcpp::IntegerVector>(avgR) - 1;
       
       V_frequencies_i=V_frequencies_i[V_order_i];
       V_mean_diss_i=V_mean_diss_i[V_order_i];
-      uvec index_i_ordered=index_i.elem(as<uvec>(V_order_i));
-      vec V_length_i=V_length.elem(index_i_ordered);
+      arma::uvec index_i_ordered=index_i.elem(Rcpp::as<arma::uvec>(V_order_i));
+      arma::vec V_length_i=V_length.elem(index_i_ordered);
       
       // select motifs to keep
-      uvec keep(index_i_size,fill::ones);
+      arma::uvec keep(index_i_size,arma::fill::ones);
       for(int i = 0;i<index_i_size;++i)
       {
         if(keep[i])
@@ -179,58 +127,59 @@ List motifs_search_cpp(const List& Y, // list of list of matrices
          select[count++] = index_i_ordered[i];
          keep[i] = 0;
          // motifs with length different enough from length of selected motif
-         const uvec& lhs = V_length_i < (static_cast<double>(V_length_i[i])*(1-length_diff));
-         const uvec& rhs = V_length_i > (static_cast<double>(V_length_i[i])*(1+length_diff));
+         const arma::uvec& lhs = V_length_i < (static_cast<double>(V_length_i[i])*(1-length_diff));
+         const arma::uvec& rhs = V_length_i > (static_cast<double>(V_length_i[i])*(1+length_diff));
          keep = keep && (keep && (lhs || rhs));
         }
       }
     }
     select.resize(count);
-    V_final = V_final[as<IntegerVector>(wrap((select)))];
+    V_final = V_final[Rcpp::as<Rcpp::IntegerVector>(Rcpp::wrap((select)))];
     V_length_final = V_length_final.elem(select);
     V_R_m = V_R_m.elem(select);
-    V_occurrences = V_occurrences[as<IntegerVector>(wrap((select)))];
+    V_occurrences = V_occurrences[Rcpp::as<Rcpp::IntegerVector>(Rcpp::wrap((select)))];
     int V_occurrences_size = count; // set the new size 
 
     auto range_rows = std::views::iota(0,V_occurrences_size) | std::views::transform([&V_occurrences](int j)
-    {return as<mat>(V_occurrences[j]).n_rows;});
+    {return Rcpp::as<arma::mat>(V_occurrences[j]).n_rows;});
     auto range_mean = std::views::iota(0,V_occurrences_size) | std::views::transform([&V_occurrences](int j)
-    {return mean(as<mat>(V_occurrences[j]).col(2));});
+    {return mean(Rcpp::as<arma::mat>(V_occurrences[j]).col(2));});
     
-    NumericVector V_frequencies(range_rows.begin(),range_rows.end());
-    NumericVector V_mean_diss(range_mean.begin(),range_mean.end());
+    Rcpp::NumericVector V_frequencies(range_rows.begin(),range_rows.end());
+    Rcpp::NumericVector V_mean_diss(range_mean.begin(),range_mean.end());
     
-    const vec& avgR = avg_rank(-1 * V_frequencies)+avg_rank(V_mean_diss);
-    IntegerVector V_order = order2<vec,IntegerVector>(avgR) - 1;
+    const arma::vec& avgR = util::avg_rank<Rcpp::NumericVector,Comparator<Rcpp::NumericVector>>(-1 * V_frequencies)+util::avg_rank<Rcpp::NumericVector,Comparator<Rcpp::NumericVector>>(V_mean_diss);
+    Rcpp::IntegerVector V_order = util::order2<arma::vec,Rcpp::IntegerVector>(avgR) - 1;
     V_final = V_final[V_order];
     V_occurrences = V_occurrences[V_order];
-    V_length_final = arma::conv_to<vec>::from(V_length_final.elem(as<uvec>(V_order)));
-    V_R_m = arma::conv_to<vec>::from(V_R_m.elem(as<uvec>(V_order)));
+    V_length_final = arma::conv_to<arma::vec>::from(V_length_final.elem(Rcpp::as<arma::uvec>(V_order)));
+    V_R_m = arma::conv_to<arma::vec>::from(V_R_m.elem(Rcpp::as<arma::uvec>(V_order)));
     V_frequencies_final = V_frequencies[V_order];
     V_mean_diss_final = V_mean_diss[V_order];
-    index_final = as<IntegerVector>(wrap(arma::conv_to<uvec>::from(not_null.elem(select.elem(as<uvec>(V_order))))));//not_null[select][V_order]
+    index_final = Rcpp::as<Rcpp::IntegerVector>(Rcpp::wrap(arma::conv_to<arma::uvec>::from(not_null.elem(select.elem(Rcpp::as<arma::uvec>(V_order))))));//not_null[select][V_order]
   }
   else
   {
     for(int i_hclust = 0;i_hclust < n_hclust;++i_hclust)
     {
-      const uvec& index_i = find(V_hclust==i_hclust);
+      const arma::uvec& index_i = find(V_hclust==i_hclust);
       std::size_t index_i_size = index_i.size();
       const auto& V_D_i = D_clean.cols(index_i);
       const auto& Logic = V_D_i <= R_m[i_hclust];
-      vec V_frequencies_approx_i = arma::conv_to<vec>::from(sum(Logic, 0).t());
-      vec V_mean_diss_approx_i = conv_to<vec>::from(sum(V_D_i % Logic, 0).t() / V_frequencies_approx_i);
+      arma::vec V_frequencies_approx_i = arma::conv_to<arma::vec>::from(sum(Logic, 0).t());
+      arma::vec V_mean_diss_approx_i = arma::conv_to<arma::vec>::from(sum(V_D_i % Logic, 0).t() / V_frequencies_approx_i);
       
-      vec avgR = avg_rank(arma::conv_to<vec>::from(-1 * V_frequencies_approx_i))+avg_rank(V_mean_diss_approx_i);
-      uvec V_order_i = order2<vec,uvec>(avgR) - 1; // order starts to count from 1 not zero
+      arma::vec avgR = util::avg_rank<arma::vec,Comparator<arma::vec>>(arma::conv_to<arma::vec>::from(-1 * V_frequencies_approx_i))
+                     + util::avg_rank<arma::vec,Comparator<arma::vec>>(V_mean_diss_approx_i);
+      arma::uvec V_order_i = util::order2<arma::vec,arma::uvec>(avgR) - 1; // order starts to count from 1 not zero
       
       V_frequencies_approx_i=V_frequencies_approx_i.elem(V_order_i); 
       V_mean_diss_approx_i=V_mean_diss_approx_i.elem(V_order_i);
-      uvec index_i_ordered=index_i.elem(V_order_i);
-      vec V_length_i=V_length.elem(index_i_ordered); 
+      arma::uvec index_i_ordered=index_i.elem(V_order_i);
+      arma::vec V_length_i=V_length.elem(index_i_ordered); 
       
       // select motifs to keep
-      uvec keep(index_i_size,fill::ones);
+      arma::uvec keep(index_i_size,arma::fill::ones);
       for(int i = 0;i<index_i_size;++i)
       {
         if(keep[i])
@@ -238,64 +187,69 @@ List motifs_search_cpp(const List& Y, // list of list of matrices
           select[count++] = index_i_ordered[i];
           keep[i] = 0;
           // motifs with length different enough from length of selected motif
-          const uvec& lhs = V_length_i < (static_cast<double>(V_length_i[i])*(1-length_diff));
-          const uvec& rhs = V_length_i > (static_cast<double>(V_length_i[i])*(1+length_diff));
+          const arma::uvec& lhs = V_length_i < (static_cast<double>(V_length_i[i])*(1-length_diff));
+          const arma::uvec& rhs = V_length_i > (static_cast<double>(V_length_i[i])*(1+length_diff));
           keep = keep && (keep && (lhs || rhs));
         }
       }
     }
+  
       select.resize(count);
-      V_final = V[as<IntegerVector>(wrap((select)))];
+      V_final = V[Rcpp::as<Rcpp::IntegerVector>(Rcpp::wrap((select)))];
       V_size = count;
       V_length_final = V_length.elem(select); 
       V_R_m = R_m.elem(V_hclust.elem(select));
-      uvec c_k = conv_to<uvec>::from(floor(V_length_final*(1-max_gap)));
-      const uvec& index_logic = find(c_k < c.elem(select)); 
+      arma::uvec c_k = arma::conv_to<arma::uvec>::from(arma::floor(V_length_final*(1-max_gap)));
+      const arma::uvec& index_logic = arma::find(c_k < c.elem(select)); 
       c_k.elem(index_logic) = arma::conv_to<arma::uvec>::from(c.elem(select.elem(index_logic)));
-  
+      
       // find occurrences
       count = 0;
-      uvec not_null(V_size);      
+      arma::uvec not_null(V_size); 
       for(int i = 0; i < V_size;++i) 
       {
         V_occurrences[i] = find_occurrences_cpp(V_final[i],Y,
-                                            V_R_m[i],
-                                            alpha,w,c_k[i], // non so se c_k[i%c_k.size()]
-                                            use0,use1); // return a list of matrix or empty vector c()
-        if(Nullable<mat>(V_occurrences[i]).isNotNull())
+                                                V_R_m[i],
+                                                alpha,w,c_k[i], // non so se c_k[i%c_k.size()]
+                                                use0,use1,
+                                                diss_d0_d1_L2, 
+                                                domain,
+                                                select_domain); // return a list of matrix or empty vector c()
+        if(Rcpp::Nullable<arma::mat>(V_occurrences[i]).isNotNull())
           not_null[count++] = i;
       }
-      
       not_null.resize(count); // resize the vector 
-      V_final = V_final[as<IntegerVector>(wrap((not_null)))];
-      V_occurrences = V_occurrences[as<IntegerVector>(wrap((not_null)))];
+      V_final = V_final[Rcpp::as<Rcpp::IntegerVector>(Rcpp::wrap((not_null)))];
+      V_occurrences = V_occurrences[Rcpp::as<Rcpp::IntegerVector>(Rcpp::wrap((not_null)))];
       V_length_final = V_length_final.elem(not_null);
       V_R_m = arma::conv_to<arma::vec>::from(V_R_m.elem(not_null));
-      
+    
       auto range_rows = std::views::iota(0,count) | std::views::transform([&V_occurrences](int j)
-      {return as<mat>(V_occurrences[j]).n_rows;});
+      {return Rcpp::as<arma::mat>(V_occurrences[j]).n_rows;});
       auto range_mean = std::views::iota(0,count) | std::views::transform([&V_occurrences](int j)
-      {return mean(as<mat>(V_occurrences[j]).col(2));});
-      NumericVector V_frequencies(range_rows.begin(),range_rows.end());
-      NumericVector V_mean_diss(range_mean.begin(),range_mean.end());
-
-      const vec& avgR = avg_rank(-1 * V_frequencies)+avg_rank(V_mean_diss);
-      IntegerVector V_order = (order2<vec,IntegerVector>(avgR) - 1);
+      {return mean(Rcpp::as<arma::mat>(V_occurrences[j]).col(2));});
+      Rcpp::NumericVector V_frequencies(range_rows.begin(),range_rows.end());
+      Rcpp::NumericVector V_mean_diss(range_mean.begin(),range_mean.end());
+      
+      const arma::vec& avgR = util::avg_rank<Rcpp::NumericVector,Comparator<Rcpp::NumericVector>>(-1 * V_frequencies)
+                            +util::avg_rank<Rcpp::NumericVector,Comparator<Rcpp::NumericVector>>(V_mean_diss);
+      Rcpp::IntegerVector V_order = (util::order2<arma::vec,Rcpp::IntegerVector>(avgR) - 1);
       V_final = V_final[V_order];
       V_occurrences = V_occurrences[V_order];
-      V_length_final = V_length_final.elem(as<uvec>(V_order));
-      V_R_m = arma::conv_to<arma::vec>::from(V_R_m.elem(as<uvec>(V_order)));
+      V_length_final = V_length_final.elem(Rcpp::as<arma::uvec>(V_order));
+      V_R_m = arma::conv_to<arma::vec>::from(V_R_m.elem(Rcpp::as<arma::uvec>(V_order)));
       V_frequencies_final = V_frequencies[V_order];
       V_mean_diss_final = V_mean_diss[V_order];
-      index_final = as<IntegerVector>(wrap(arma::conv_to<uvec>::from(select.elem(not_null.elem(as<uvec>(V_order)))))); //select[not_null][V_order]
+      index_final = Rcpp::as<Rcpp::IntegerVector>(Rcpp::wrap(arma::conv_to<arma::uvec>::from(select.elem(not_null.elem(Rcpp::as<arma::uvec>(V_order)))))); //select[not_null][V_order]
   }
-  return List::create(Named("V") = V_final,
-                      Named("V_length")=IntegerVector(V_length_final.begin(),V_length_final.end()),
-                      Named("V_occurrences")=V_occurrences,
-                      Named("V_frequencies")=V_frequencies_final,
-                      Named("V_mean_diss")=V_mean_diss_final,
-                      Named("R_motifs")=NumericVector(V_R_m.begin(),V_R_m.end()),
-                      Named("index_final")=index_final);
+  V_hclust += 1;
+  return Rcpp::List::create(Rcpp::Named("V") = V_final,
+                            Rcpp::Named("V_length")= Rcpp::IntegerVector(V_length_final.begin(),V_length_final.end()),
+                            Rcpp::Named("V_occurrences")=V_occurrences,
+                            Rcpp::Named("V_frequencies")=V_frequencies_final,
+                            Rcpp::Named("V_mean_diss")=V_mean_diss_final,
+                            Rcpp::Named("R_motifs")= Rcpp::NumericVector(V_R_m.begin(),V_R_m.end()),
+                            Rcpp::Named("index_final")=index_final);
 }
 
 

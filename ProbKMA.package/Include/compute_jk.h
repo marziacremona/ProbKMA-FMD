@@ -12,6 +12,9 @@ double compute_Jk_rcpp(const Rcpp::List & v,
                        int m,
                        bool use0,
                        bool use1,
+                       const Rcpp::Function & domain,
+                       const Rcpp::Function & select_domain,
+                       const Rcpp::Function& diss_d0_d1_L2,
                        Rcpp::Nullable<int> c_k = R_NilValue,
                        Rcpp::Nullable<Rcpp::LogicalVector> keep_k = R_NilValue);
 

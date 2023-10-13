@@ -1,11 +1,8 @@
-#include "RcppArmadillo.h"
-#include <numeric>
-#include <ranges>
-#include <algorithm>
+#include "compute_jk.h"
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::plugins(cpp20)]]
 
-// [[Rcpp::export]]
+
 double compute_Jk_rcpp(const Rcpp::List & v,
                        const arma::ivec & s_k,
                        const arma::vec & p_k,
