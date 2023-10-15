@@ -106,6 +106,7 @@ namespace util
         result(k++) = v(i);
     return result;
   }
+  
 }
 
 

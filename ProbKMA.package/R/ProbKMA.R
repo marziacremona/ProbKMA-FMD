@@ -65,10 +65,8 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
   rm(core_number)
   if(worker_number>1){
     cl_probKMA=parallel::makeCluster(worker_number,timeout=60*60*24*30)
-    parallel::clusterExport(cl_probKMA,c('diss_d0_d1_L2','domain','select_domain'),envir = e1)
-    print("ciao3")
+    parallel::clusterExport(cl_probKMA,c('diss_d0_d1_L2','domain','select_domain'),envir = environment())
     on.exit(parallel::stopCluster(cl_probKMA))
-    print("addio")
   }else{
     cl_probKMA=NULL
   }
@@ -448,11 +446,13 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     c_k=floor(unlist(lapply(V_new,function(v_new) unlist(lapply(v_new,nrow))[1]))*(1-max_gap))
     c_k[c_k<c]=c
     c_k=rep(c_k,each=length(Y))
-    YV=expand.grid(Y,V_new)
-    SD=mapply_custom(cl_probKMA,find_min_diss,YV[,1],YV[,2],c_k,
-                      MoreArgs=list(alpha=alpha,w=w,d=d,use0=use0,use1=use1),SIMPLIFY=TRUE)
-    S_new=matrix(SD[1,],ncol=K)
-    D_new=matrix(SD[2,],ncol=K)
+    SD <- .find_shift_warp_min(Y,V_new,w,c_k,K,d,max_gap,
+                               alpha,use0,use1,
+                               domain,
+                               select_domain,
+                               diss_d0_d1_L2)
+    S_new=SD[[1]]
+    D_new=SD[[2]]
     end=proc.time()
     #message('  find shift: ',round((end-start)[3],2))
     
@@ -577,6 +577,5 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
   
   
   ### return output ####################################################################################
-  print("ccc")
   return(output)
 }

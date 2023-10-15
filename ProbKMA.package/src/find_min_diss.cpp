@@ -164,4 +164,33 @@
     return Rcpp::NumericVector::create(min_s, min_d); 
   }
 
+// [[Rcpp::export(.find_shift_warp_min)]]
+Rcpp::List find_shift_warp_min(const Rcpp::List & Y, // @TODO: void function 
+                               const Rcpp::List & V_new,
+                               const arma::vec & w,
+                               const arma::ivec & c_k,
+                               unsigned int K,
+                               unsigned int d,
+                               double max_gap,
+                               double alpha,
+                               bool use0,
+                               bool use1,
+                               const Rcpp::Function & domain,
+                               const Rcpp::Function & select_domain,
+                               const Rcpp::Function & diss_d0_d1_L2) {
+  
+  
+  const unsigned int Y_size = Y.size();
+  const unsigned int V_new_size = V_new.size();
+  Rcpp::NumericVector sd(2);
+  arma::imat S_new(Y_size,V_new_size);
+  arma::mat  D_new(Y_size,V_new_size);
+  for (unsigned int i = 0; i < V_new_size; ++i) // @TODO: parallelize
+    for (unsigned int j = 0; j < Y_size; ++j){ 
+      sd = find_diss(Y[j],V_new[i],w,alpha,c_k(i),d,use0,use1,domain,select_domain,diss_d0_d1_L2); // @TODO: modify output to a vec 
+      S_new(j,i) = sd[0];
+      D_new(j,i) = sd[1];
+    }
+    return Rcpp::List::create(S_new,D_new);
+}
 

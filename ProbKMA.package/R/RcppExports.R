@@ -17,6 +17,10 @@
     .Call(`_ProbKMA_package_find_diss_aligned_rcpp`, y, v, w, alpha, aligned, d, use0, use1, domain, select_domain, diss_d0_d1_L2)
 }
 
+.find_shift_warp_min <- function(Y, V_new, w, c_k, K, d, max_gap, alpha, use0, use1, domain, select_domain, diss_d0_d1_L2) {
+    .Call(`_ProbKMA_package_find_shift_warp_min`, Y, V_new, w, c_k, K, d, max_gap, alpha, use0, use1, domain, select_domain, diss_d0_d1_L2)
+}
+
 .find_occurrences_cpp <- function(v, Y, R, alpha, w, c_k, use0, use1, diss_d0_d1_L2, domain, select_domain) {
     .Call(`_ProbKMA_package_find_occurrences_cpp`, v, Y, R, alpha, w, c_k, use0, use1, diss_d0_d1_L2, domain, select_domain)
 }
