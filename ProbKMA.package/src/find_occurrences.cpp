@@ -3,6 +3,7 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::plugins(cpp20)]]
 
+// [[Rcpp::export(.find_occurrences_cpp)]]
 arma::mat find_occurrences_cpp(const Rcpp::List& v,
                                const Rcpp::List& Y,
                                const double R,

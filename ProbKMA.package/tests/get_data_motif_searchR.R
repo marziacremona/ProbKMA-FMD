@@ -6,7 +6,7 @@ source("../../ProbKMA-FMD_functions_modified.r")
 
 #############################
 ### SIMULATION SCENARIO 1 ###
-
+setwd("/Users/niccoloferesini/Desktop/ProbKMA-FMD/ProbKMA.package/tests")
 load(paste0('../Data/indel_rates.RData'))
 load(paste0('../Data/substitution_rates.RData'))
 

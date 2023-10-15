@@ -4,78 +4,7 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::plugins(cpp20)]]
 
-Rcpp::NumericVector find_diss_aligned_rcpp(const Rcpp::List &y,
-                                           const Rcpp::List &v,  
-                                           const arma::vec & w, 
-                                           double alpha,
-                                           bool aligned,
-                                           unsigned int d,
-                                           bool use0,
-                                           bool use1,
-                                           const Rcpp::Function & domain,
-                                           const Rcpp::Function & select_domain,
-                                           const Rcpp::Function & diss_d0_d1_L2)
-{
-  Rcpp::LogicalVector v_dom = Rcpp::as<Rcpp::LogicalVector>(domain(v,use0));
-  Rcpp::List v_new = select_domain(v, v_dom, use0, use1);
-  int v_len = v_dom.size();
-  int y_len = Rcpp::as<arma::mat>(y[0]).n_rows;
-  Rcpp::IntegerVector s_rep;
-  if (aligned){
-    s_rep = 1;
-  } else {
-    s_rep = util::myseq(1, y_len - v_len + 1);
-  }
-  std::size_t s_rep_size = s_rep.size();
-  Rcpp::List y_rep(s_rep_size);
-  
-  // Convert y[0] and y[1] to mat objects
-  const int index_size = v_len;
-  arma::mat temp_y0, temp_y1;
-  if (use0) {
-    temp_y0 = Rcpp::as<arma::mat>(y[0]);
-  }
-  if (use1) {
-    temp_y1 = Rcpp::as<arma::mat>(y[1]);
-  }
-  
-  auto index_range = std::views::iota(0,index_size);
-  
-  for (unsigned int i = 0; i < s_rep_size; ++i) {
-    Rcpp::IntegerVector index = s_rep[i] - 1 + util::myseq(1,v_len);
-    Rcpp::List y_rep_i = Rcpp::List::create(Rcpp::Named("y0") = R_NilValue, Rcpp::Named("y1") = R_NilValue);
-    auto j_true = index_range
-      | std::views::filter([&index,&y_len](int j){return((index[j] > 0) && (index[j] <= y_len));});
-    if (use0) {
-      arma::mat new_y0(index_size, d);
-      new_y0.fill(arma::datum::nan);
-      std::for_each(j_true.begin(),j_true.end(),[&new_y0,&temp_y0,&index](int j){new_y0.row(j) = temp_y0.row(index[j] - 1);});
-      y_rep_i["y0"] = new_y0;
-    }
-    if (use1) {
-      arma::mat new_y1(index_size, d);
-      new_y1.fill(arma::datum::nan);
-      std::for_each(j_true.begin(),j_true.end(),[&new_y1,&temp_y1,&index](int j){new_y1.row(j) = temp_y1.row(index[j] - 1);});
-      y_rep_i["y1"] = new_y1;
-      }
-    y_rep_i = select_domain(y_rep_i, v_dom, use0, use1);
-    y_rep[i] = y_rep_i;
-    }
-  
-  double min_d = std::numeric_limits<double>::max();
-  int min_s = 0;
-  
-  for (unsigned int i = 0; i < s_rep_size; i++) {
-    double dist = Rcpp::as<double>(diss_d0_d1_L2(y_rep[i], v_new, w, alpha));
-    if (dist < min_d){
-      min_d = dist;
-      min_s = s_rep[i];
-    }
-  }
-  return Rcpp::NumericVector::create(min_s, min_d); 
-}
-
-
+// [[Rcpp::export(.probKMA_silhouette_rcpp)]]
 Rcpp::List probKMA_silhouette_rcpp(const Rcpp::List & probKMA_results,
                                    const Rcpp::Function & domain,
                                    const Rcpp::Function & select_domain,
@@ -85,7 +14,7 @@ Rcpp::List probKMA_silhouette_rcpp(const Rcpp::List & probKMA_results,
   bool use0, use1;
   unsigned int Y_size;
   
-  std::string diss = as<std::string>(probKMA_results["diss"]);
+  const std::string& diss = Rcpp::as<std::string>(probKMA_results["diss"]);
   
   if (diss == "d0_L2" || diss == "d0_d1_L2") {
     const Rcpp::List & Y0 = probKMA_results["Y0"];
@@ -120,7 +49,7 @@ Rcpp::List probKMA_silhouette_rcpp(const Rcpp::List & probKMA_results,
                    { return Rcpp::List::create(Rcpp::_["y0"] = R_NilValue,
                                            Rcpp::_["y1"] = y1); });
   } else {
-    alpha = as<double>(probKMA_results["alpha"]);
+    alpha = Rcpp::as<double>(probKMA_results["alpha"]);
     use0 = true;
     use1 = true;
     const Rcpp::List & Y0 = probKMA_results["Y0"];
@@ -362,6 +291,6 @@ Rcpp::List probKMA_silhouette_rcpp(const Rcpp::List & probKMA_results,
    silhouette_average(k) = mean(silhouette_k);
  }
  
- return Rcpp::List::create(silhouette,Y_motifs,curves_in_motifs,silhouette_average);
+ return Rcpp::List::create(silhouette,Y_motifs,curves_in_motifs,silhouette_average,curves_in_motifs_number);
  
 }

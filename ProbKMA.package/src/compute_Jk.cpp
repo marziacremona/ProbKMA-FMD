@@ -2,7 +2,7 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::plugins(cpp20)]]
 
-
+//[[Rcpp::export(.compute_Jk_rcpp)]]
 double compute_Jk_rcpp(const Rcpp::List & v,
                        const arma::ivec & s_k,
                        const arma::vec & p_k,

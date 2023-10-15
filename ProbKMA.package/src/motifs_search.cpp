@@ -27,6 +27,7 @@ public:
   }
 };
 
+// [[Rcpp::export(.motifs_search_cpp)]]
 Rcpp::List motifs_search_cpp(const Rcpp::List& Y, // list of list of matrices
                              const Rcpp::List& V,  // list of list of matrices 
                              const Rcpp::List& V0_clean,

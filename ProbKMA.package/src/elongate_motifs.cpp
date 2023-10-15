@@ -127,7 +127,8 @@ void elongation_rcpp(Rcpp::List & V_new,
 }
 
 
-// function which returns V_new, V_dom, S_k after the elongation 
+// function which returns V_new, V_dom, S_k after the elongation
+//[[Rcpp::export(.elongate_motifs)]]
 void elongate_motifs(Rcpp::List & V_new,
                      Rcpp::List & V_dom,
                      Rcpp::List & S_k,
