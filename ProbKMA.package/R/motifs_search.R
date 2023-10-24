@@ -1,9 +1,11 @@
 #' @title motifs_search
 #'
-#' @description Find occurrences of the candidate motifs in the curves and sort them according to their frequencies and radius.
-#' In each group (as defined by cutting the dendrogram at high 2*Rall), we choose the motif
-#' with highest frequency and lower mean dissimilarity (the one ranking best in both dimensions).
-#' Additional motifs can be chosen in a group, if their lengths differ enough from the length of the first motif chosen.
+#' @description Find occurrences of the candidate motifs in the curves and sort 
+#' them according to their frequencies and radius,
+#' In each group (as defined by cutting the dendrogram at high 2*Rall), 
+#' we choose the motif
+#' with highest frequency and lower mean dissimilarity (the one ranking best in both dimensions),
+#' Additional motifs can be chosen in a group, if their lengths differ enough from the length of the first motif chosen,
 #' A candidate motif matches a piece of curve if their dissimilarity is less than the corresponding R_m.
 #'
 #' @param cluster_candidate_motifs_results output of cluster_candidate_motifs function.
@@ -15,10 +17,10 @@
 #' and mean dissimilarity to choose motifs in groups (more accurate, but time consuming). Otherwise,
 #' uses approximate frequency and mean dissimilarity (default).
 #' @param length_diff minimum difference in length among motifs of the same group, required in ordered
-#'to keep more than one motif, in % of the most frequent motif.
+#' to keep more than one motif, in percentage of the most frequent motif.
 #' @param worker_number number of CPU cores to be used for parallelization (default number of CPU cores).
 #' If worker_number=1, the function is run sequentially.
-#' @return A list containing Y0 and Y1 output of cluster_candidate_motifs function; and
+#' @return A list containing Y0 and Y1 output of cluster_candidate_motifs function and:
 #' @return \item{V0}{ list of founds motifs}
 #' @return \item{V1}{ list of derived of founds motifs}
 #' @return \item{V_length}{ vector of real lengths of founds motifs}

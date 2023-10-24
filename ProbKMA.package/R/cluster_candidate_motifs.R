@@ -1,27 +1,28 @@
 #' @title cluster_candidate_motifs
-#'
+#' 
 #' @description Determine a global radius Rall (based on distances between all motifs and all curves), and cluster candidate
 #' motifs based on their distance, requiring groups to be more than 2*Rall apart. Then for each group m=1,...,M
 #' determine a group-specific radius Rm (based on distances between motifs of the same group and all curves).
-#'
+#' 
 #' @param filter_candidate_motifs_results output of filter_candidate_motifs function.
 #' @param motif_overlap minimum overlap required between candidate motifs in their distance computation,
-#' in % of the shortest motif.
+#' in percentage of the shortest motif.
 #' @param k_knn number of neighbors to be used in k-nearest neighbors, in order to determine Rall and Rm
-#'when the two groups (curves with/without motif) are not separated.
+#' when the two groups (curves with/without motif) are not separated.
 #' @param votes_knn_Rall threshold on the percentage of votes for class 1 (curve has the motif) in
 #' k-nearest neighbors, in order to determine Rall.
 #' @param votes_knn_Rm threshold on the percentage of votes for class 1 (curve has the motif) in
 #' k-nearest neighbors, in order to determine Rm.
 #' @param worker_number number of CPU cores to be used for parallelization (default number of CPU cores).
 #' If worker_number=1, the function is run sequentially.
-#' @return A list containing some its input: k_knn, votes_knn_Rall and votes_knn_Rm;
-#' the outputs of filter_candidate_patterns function;
-#' @return \item{VV_D}{ matrix of distances between candidates motifs after filtering}
-#' @return \item{VV_S}{ matrix of shift deformations of candidates motifs after filtering}
-#' @return \item{R_all}{ global radius used to cut the dendrogram}
-#' @return \item{hclust_res}{list of result hierarchical clustering based on the distances candidate motifs obtained after filtering}
-#' @author Marzia Angela CREMONA & Francesca CHIAROMONTE
+#' 
+#' @return A list containing some of its input: k_knn, votes_knn_Rall and votes_knn_Rm, the outputs of filter_candidate_patterns function and:
+#'   \item{VV_D}{ matrix of distances between candidates motifs after filtering}
+#'   \item{VV_S}{ matrix of shift deformations of candidates motifs after filtering}
+#'   \item{R_all}{ global radius used to cut the dendrogram}
+#'   \item{hclust_res}{list of result hierarchical clustering based on the distances candidate motifs obtained after filtering}
+#'   
+#' @author Marzia Angela Cremona & Francesca Chiaromonte
 #' @export
 cluster_candidate_motifs <- function(filter_candidate_motifs_results,motif_overlap=0.6,
                                      k_knn=3,votes_knn_Rall=0.5,votes_knn_Rm=0.5,worker_number=NULL){
