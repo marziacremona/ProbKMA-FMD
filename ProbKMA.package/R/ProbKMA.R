@@ -453,6 +453,7 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
                                diss_d0_d1_L2)
     S_new=SD[[1]]
     D_new=SD[[2]]
+    rm(SD)
     end=proc.time()
     #message('  find shift: ',round((end-start)[3],2))
     

@@ -29,7 +29,7 @@ double compute_Jk_rcpp(const Rcpp::List & v,
   Rcpp::List v_new = select_domain(v, v_dom, use0, use1);
   
   const Rcpp::List & first_y = Y[0]; // Y is list of list, first_y is the first list, first_y[0] is the first list of first_y 
-  const arma::mat & first_y0 = use0 ? as<arma::mat>(first_y[0]) : as<arma::mat>(first_y[1]);
+  const arma::mat & first_y0 = use0 ? Rcpp::as<arma::mat>(first_y[0]) : Rcpp::as<arma::mat>(first_y[1]);
   
   // dimensionality of the curves
   const unsigned int d = first_y0.n_cols;
@@ -53,7 +53,7 @@ double compute_Jk_rcpp(const Rcpp::List & v,
     Rcpp::List y_i = Y[i];
     
     // length of the curve 
-    const int y_len = as<arma::mat>(y_i[0]).n_rows;
+    const int y_len = Rcpp::as<arma::mat>(y_i[0]).n_rows;
     
     arma::mat new_y0(index_size + std::max(0, 1-s_k_i), d);
     
@@ -101,7 +101,7 @@ double compute_Jk_rcpp(const Rcpp::List & v,
       }
     }
     
-    int c_k_notnull = as<int>(c_k);
+    int c_k_notnull = Rcpp::as<int>(c_k);
     
     Rcpp::LogicalVector check_lengths = supp_inters_length < c_k_notnull;
     
