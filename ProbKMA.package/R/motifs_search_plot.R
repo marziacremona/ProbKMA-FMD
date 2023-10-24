@@ -1,4 +1,14 @@
-
+#' motifs_search_plot
+#'
+#' Plot the results of motifs_search.
+#'
+#' @param motifs_search_results output of motifs_search function.
+#' @param ylab a vector of length d, with the titles for the y axis for each dimension.
+#' @param freq_threshold plot only motifs with frequency at least equal to freq_threshold.
+#' @param top_n if 'all', plot all motifs found. If top_n is an integer, then all top top_n motifs are plotted.
+#' @param plot_curves if TRUE, plot all the curves with coloured motifs.
+#' @author Marzia Angela Cremona & Francesca Chiaromonte
+#' @export
 motifs_search_plot <- function(motifs_search_results,ylab='',freq_threshold=5,top_n='all',plot_curves=TRUE){
   # Plot the results of motifs_search.
   # motifs_search_results: output of motifs_search function.

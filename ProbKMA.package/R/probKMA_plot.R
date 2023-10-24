@@ -1,9 +1,14 @@
-
+#' @title probKMA_plot
+#'
+#' @description Plot the results of probKMA.
+#'
+#' @param probKMA_results output of probKMA function.
+#' @param ylab a vector of length d, with the titles for the y axis for each dimension.
+#' @param cleaned if TRUE, plot the cleaned motifs.
+#' @return plot of memberships motifs, objective function and Bhattacharyya distance
+#' @author Marzia Angela Cremone & Francesca Chiaromonte
+#' @export
 probKMA_plot <- function(probKMA_results,ylab='',cleaned=FALSE){
-  # Plot the results of probKMA.
-  # probKMA_results: output of probKMA function.
-  # ylab: a vector of length d, with the titles for the y axis for each dimension.
-  # cleaned: if TRUE, plot the cleaned motifs.
   
   d=ncol(probKMA_results$Y0[[1]])
   N=nrow(probKMA_results$P)

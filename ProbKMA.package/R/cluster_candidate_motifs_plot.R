@@ -1,14 +1,18 @@
-
+#' @title cluster_candidate_motifs_plot
+#'
+#' @description Plot the results of cluster_candidate_motifs.
+#'
+#' @param cluster_candidate_motifs_results output of cluster_candidate_motifs function.
+#' @param R_all global radius, used to cut the dendrogram (requiring groups to be more than 2*Rall apart).
+#' @param R_m vector with group-specific radii. The length of the vector must match the number of clusters
+#' obtained cutting the dendrogram at height 2*Rall. If NULL, Rm is determined in each group (based on
+#' distances between motifs of the same group and all curves).
+#' @param ask if TRUE the user is prompted before a new plot is drawn.
+#' @param ylab Name of y axis
+#' @author Marzia Angela Cremona & Francesca Chiaromonte
 #' @export
 cluster_candidate_motifs_plot <- function(cluster_candidate_motifs_results,ylab='',
                                           R_all=cluster_candidate_motifs_results$R_all,R_m=NULL,ask=TRUE){
-  # Plot the results of cluster_candidate_motifs. 
-  # cluster_candidate_motifs_results: output of cluster_candidate_motifs function.
-  # R_all: global radius, used to cut the dendrogram (requiring groups to be more than 2*Rall apart).
-  # R_m: vector with group-specific radii. The length of the vector must match the number of clusters
-  #      obtained cutting the dendrogram at height 2*Rall. If NULL, Rm is determined in each group (based on distances between motifs of the same group and all curves).
-  # ask: if TRUE the user is prompted before a new plot is drawn.
-  
   ### prepare input data ##################################################################################
   if(cluster_candidate_motifs_results$diss=='d0_L2'){
     alpha=0

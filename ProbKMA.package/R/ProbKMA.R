@@ -1,43 +1,68 @@
-
-#' Probabilistic k-mean with local alignment to find candidate motifs.
-#' Y0: list of N vectors, for univariate curves y_i(x), or
-#'     list of N matrices with d columns, for d-dimensional curves y_i(x),
-#'     with the evaluation of curves (all curves should be evaluated on a uniform grid).
-#'     When y_j(x)=NA in the dimension j, then y_j(x)=NA in ALL dimensions
-#' Y1: list of N vectors, for univariate derivative curves y'_i(x), or
-#'     list of N matrices with d columns, for d-dimensional derivatibe curves y'_i(x),
-#'     with the evaluation of the curves derivatives (all curves should be evaluated on a uniform grid).
-#'     When y'_j(x)=NA in the dimension j, then y'_j(x)=NA in ALL dimensions.
-#'     Must be provided when diss='d1_L2' or diss='d0_d1_L2'.
-#' standardize: if TRUE, each dimension is standardized (Z score on all the regions together).
-#' K: number of motifs.
-#' c: minimum motif lengths. Can be an integer (or a vector of K integers).
-#' c_max: maximum motif lengths. Can be an integer (or a vector of K integers).
-#' P0: initial membership matrix, with N row and K column (if NULL, a random P0 is choosen).
-#' S0: initial shift warping matrix, with N row and K column (if NULL, a random S0 is choosen).
-#' diss: dissimilarity. Possible choices are 'd0_L2', 'd1_L2', 'd0_d1_L2'. 
-#' alpha: when diss='d0_d1_L2', weight coefficient between d0_L2 and d1_L2 (alpha=0 means d0_L2, alpha=1 means d1_L2).
-#' w: vector of weights for the dissimilarity index in the different dimensions (w>0).
-#' m>1: weighting exponent in least-squares functional.
-#' iter_max: the maximum number of iterations allowed.
-#' stop_criterion: criterion to stop iterate, based on the Bhattacharyya distance between memberships in subsequent iterations. 
-#'                 Possible choices are: 'max' for the maximum of distances in the different motifs;
-#'                                       'mean' for the average of distances in the different motifs;
-#'                                       'quantile' for the quantile of distances in the different motifs (in this case, quantile must be provided).
-#' quantile: probability in [0,1] to be used if stop.criterion='quantile'.
-#' tol: method tolerance (method stops if the stop criterion <tol).
-#' iter4elong: motifs elongation is performed every iter4elong iterations (if iter4elong>iter.max, no elongation is done).
-#' tol4elong: tolerance on the Bhattacharyya distance (with the choice made in stop.criterion) for performing motifs elongation.
-#' max_elong: maximum elongation allowed in a single iteration, as percentage of the motif length.
-#' trials_elong: number of (equispaced) elongation trials at each side of the motif in a single iteration.
-#' deltaJk_elong: maximum relative objective function increasing allowed in each motif elongation (for gaps and each side).
-#' max_gap: maximum gap allowed in each alignment (percentage of motif length).
-#' iter4clean: motif cleaning is performed every iter4clean iterations (if iter4clean>iter_max, no cleaning is done).
-#' tol4clean: tolerance on the Bhattacharyya distance (with the choice made in stop_criterion) for performing motif cleaning.
-#' quantile4clean: dissimilarity quantile to be used in motif cleaning.
-#' return_options: if TRUE, the options K,c,diss,w,m are returned by the function.
-#' return_init: if TRUE, P0 and S0 are returned by the function.
-#' worker_number: number of CPU cores to be used for parallelization (default number of CPU cores -1). If worker_number=1, the function is run sequentially.
+#' @title ProbKMA
+#'
+#' @description Probabilistic k-mean with local alignment to find candidate motifs.
+#'
+#' @param Y0 list of N vectors, for univariate curves y_i(x), or list of N matrices with d columns,
+#' for d-dimensional curves y_i(x), with the evaluation of curves (all curves should be evaluated on
+#' a uniform grid). When y_j(x)=NA in the dimension j, then y_j(x)=NA in ALL dimensions
+#' @param Y1 list of N vectors, for univariate derivative curves y'_i(x), or list of N matrices with
+#' d columns, for d-dimensional derivatibe curves y'_i(x), with the evaluation of the curves derivatives
+#' (all curves should be evaluated on a uniform grid). When y'_j(x)=NA in the dimension j, then y'_j(x)=NA
+#' in ALL dimensions. Must be provided when diss='d1_L2' or diss='d0_d1_L2'.
+#' @param standardize if TRUE, each dimension is standardized (Z score on all the regions together).
+#' @param K number of motifs.
+#' @param c minimum motif lengths. Can be an integer (or a vector of K integers).
+#' @param c_max maximum motif lengths. Can be an integer (or a vector of K integers).
+#' @param P0 initial membership matrix, with N row and K column (if NULL, a random P0 is choosen).
+#' @param S0 initial shift warping matrix, with N row and K column (if NULL, a random S0 is choosen).
+#' @param diss dissimilarity. Possible choices are 'd0_L2', 'd1_L2', 'd0_d1_L2'.
+#' @param alpha when diss='d0_d1_L2', weight coefficient between d0_L2 and d1_L2 (alpha=0 means d0_L2,
+#' alpha=1 means d1_L2).
+#' @param w vector of weights for the dissimilarity index in the different dimensions (w>0).
+#' @param m m>1 weighting exponent in least-squares functional.
+#' @param iter_max the maximum number of iterations allowed.
+#' @param stop_criterion criterion to stop iterate, based on the Bhattacharyya distance
+#' between memberships in subsequent iterations. Possible choices are: 'max' for the
+#' maximum of distances in the different motifs; 'mean' for the average of distances in
+#' the different motifs; 'quantile' for the quantile of distances in the different motifs
+#' (in this case, quantile must be provided).
+#' @param quantile probability in (0,1) to be used if stop.criterion='quantile'.
+#' @param tol method tolerance (method stops if the stop criterion <tol).
+#' @param iter4elong motifs elongation is performed every iter4elong iterations (if iter4elong>iter.max,
+#' no elongation is done).
+#' @param tol4elong tolerance on the Bhattacharyya distance (with the choice made in stop.criterion) for
+#' performing motifs elongation.
+#' @param max_elong maximum elongation allowed in a single iteration, as percentage of the motif length.
+#' @param trials_elong number of (equispaced) elongation trials at each side of the motif in a single
+#' iteration.
+#' @param deltaJk_elong maximum relative objective function increasing allowed in each motif elongation
+#' (for gaps and each side).
+#' @param max_gap maximum gap allowed in each alignment (percentage of motif length).
+#' @param iter4clean motif cleaning is performed every iter4clean iterations (if iter4clean>iter_max,
+#' no cleaning is done).
+#' @param tol4clean tolerance on the Bhattacharyya distance (with the choice made in stop_criterion) for
+#' performing motif cleaning.
+#' @param quantile4clean dissimilarity quantile to be used in motif cleaning.
+#' @param return_options if TRUE, the options K,c,diss,w,m are returned by the function.
+#' @param return_init if TRUE, P0 and S0 are returned by the function.
+#' @param worker_number number of CPU cores to be used for parallelization (default number of CPU cores -1).
+#' If worker_number=1, the function is run sequentially.
+#' @return A list containing some initialization and input options of the function: P0, S0 (if return_init = TRUE), Y0, Y1, standardize, K, c, c_max, diss, alpha, w, m, iter4elong, tol4elong, max_elong, trials_elong, deltaJk_elong, max_gap, iter4clean and tol4clean (if return_options = TRUE);
+#' @return \item{P}{ membership probability matrix}
+#' @return \item{P_clean}{ membership probability matrix dichotomized according to the quantile of order 1/K}
+#' @return \item{S}{ shift warping matrix}
+#' @return \item{S_clean}{ shift warping matrix after cleaning motifs}
+#' @return \item{D}{ dissimilarity matrix}
+#' @return \item{D_clean}{ dissimilarity matrix after cleaning motifs}
+#' @return \item{iter}{ iterations number}
+#' @return \item{j_iter}{ minimum objective function}
+#' @return \item{BC_dist}{ Bhattacharyya distance}
+#' @return \item{BC_dist_iter}{ Bhattacharyya distance from the last iteration}
+#' @return \item{V0}{ list of the candidates motifs}
+#' @return \item{V0_clean}{ list of the candidates motifs after cleaning}
+#' @return \item{V1}{ list of derived from candidates motifs}
+#' @return \item{V1_clean}{ list of derived from candidates motifs after cleaning}
+#' @author Marzia Angela Cremona & Francesca Chiaromonte
 #' @export
 probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
                     diss='d0_L2',alpha=NULL,w=1,m=2,

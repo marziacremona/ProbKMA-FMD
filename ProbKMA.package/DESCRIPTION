@@ -1,14 +1,15 @@
 Package: ProbKMA.package
 Type: Package
-Title: Concise Summary of What the Package Does
-Version: 1.0
+Title: Motif discovery in functional data
+Version: 1.0.1
 Date: 2023-09-16
-Author: Your Name
-Maintainer: Your Name <your@email.com>
-Description: More about what it does (maybe more than one line).
+Author: Marzia Angela Cremona, Francesca Chiaromonte, Niccolo Feresini, Riccardo Lazzarini 
+Maintainer: Cremona <marzia.cremona@fsa.ulaval.ca>
+Description: An R package for local clustering of misaligned curves and  motif discovery in functional data.
 License: GPL (>= 2)
 Suggests: tinytest
 Encoding: UTF-8
+SystemRequirements: C++20
 RoxygenNote: 7.2.3
 Imports: Rcpp (>= 1.0.11),parallel,dendextend,class,combinat,rlang
 LinkingTo: Rcpp, RcppArmadillo

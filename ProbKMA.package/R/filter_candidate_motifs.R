@@ -1,13 +1,24 @@
-
+#' @title filter_candidate_motifs
+#'
+#' @description Filter the candidate motifs on the basis of a threshold on the average silhouette index
+#' and a threshold on the size of the curves in the motif.
+#'
+#' @param find_candidate_motifs_results output of find_candidate_motif function.
+#' @param sil_threshold threshold on the average silhouette index.
+#' @param size_threshold threshold on the size of the motif (number of curves in the cluster).
+#' @param K vector with numbers of motifs that must be considered (should be a subset of
+#' find_candidate_motifs_results$K).
+#' @param c vector with minimum motifs lengths that must be considered (should be a subset of
+#' find_candidate_motifs_results$c).
+#' @return A list containing some ProbKMA options: Y0, Y1, diss, alpha, w, c, K and max_gap; and
+#' @return \item{V0_clean}{ vector of candidates motifs after filtering}
+#' @return \item{V1_clean}{ vector of deriveds candidates motifs after filtering}
+#' @return \item{D_clean}{ matrix of distances candidates motifs from the curves after filtering}
+#' @return \item{P_clean}{ matrix of probabilities membership of the candidate motifs after filtering}
+#' @author Marzia Angela Cremona & Francesca Chiaromonte
+#' @export
 filter_candidate_motifs <- function(find_candidate_motifs_results,sil_threshold=0.5,size_threshold=2,
                                     K=find_candidate_motifs_results$K,c=find_candidate_motifs_results$c){
-  # Filter the candidate motifs on the basis of a threshold on the average silhouette index
-  # and a threshold on the size of the curves in the motif. 
-  # find_candidate_motifs_results: output of find_candidate_motif function.
-  # sil_threshold: threshold on the average silhouette index.
-  # size_threshold: threshold on the size of the motif (number of curves in the cluster).
-  # K: vector with numbers of motifs that must be considered (should be a subset of find_candidate_motifs_results$K).
-  # c: vector with minimum motifs lengths that must be considered (should be a subset of find_candidate_motifs_results$c).
   
   ### check input #############################################################################################
   # check sil_threshold

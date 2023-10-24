@@ -1,21 +1,37 @@
-
+#' @title motifs_search
+#'
+#' @description Find occurrences of the candidate motifs in the curves and sort them according to their frequencies and radius.
+#' In each group (as defined by cutting the dendrogram at high 2*Rall), we choose the motif
+#' with highest frequency and lower mean dissimilarity (the one ranking best in both dimensions).
+#' Additional motifs can be chosen in a group, if their lengths differ enough from the length of the first motif chosen.
+#' A candidate motif matches a piece of curve if their dissimilarity is less than the corresponding R_m.
+#'
+#' @param cluster_candidate_motifs_results output of cluster_candidate_motifs function.
+#' @param R_all global radius, used to cut the dendrogram (requiring groups to be more than 2*Rall apart).
+#' @param R_m vector with group-specific radii, used to find motif occurrences. The length of the vector
+#' must match the number of clusters obtained cutting the dendrogram at height 2*Rall. If NULL, Rm is
+#' determined in each group (based on distances between motifs of the same group and all curves).
+#' @param use_real_occurrences if TRUE, find occurrences for all candidate motifs and uses real frequency
+#' and mean dissimilarity to choose motifs in groups (more accurate, but time consuming). Otherwise,
+#' uses approximate frequency and mean dissimilarity (default).
+#' @param length_diff minimum difference in length among motifs of the same group, required in ordered
+#'to keep more than one motif, in % of the most frequent motif.
+#' @param worker_number number of CPU cores to be used for parallelization (default number of CPU cores).
+#' If worker_number=1, the function is run sequentially.
+#' @return A list containing Y0 and Y1 output of cluster_candidate_motifs function; and
+#' @return \item{V0}{ list of founds motifs}
+#' @return \item{V1}{ list of derived of founds motifs}
+#' @return \item{V_length}{ vector of real lengths of founds motifs}
+#' @return \item{V_occurrences}{ vector of real occurrences of founds motifs}
+#' @return \item{V_frequencies}{ vector of real frequencies of founds motifs}
+#' @return \item{V_mean_diss}{ vector of real average dissimilarities between the founds motifs}
+#' @return \item{R_motifs}{ vector of radii of founds motifs}
+#' @author Marzia Angela Cremona & Francesca Chiaromonte
+#' @export
 motifs_search <- function(cluster_candidate_motifs_results,
                           R_all=cluster_candidate_motifs_results$R_all,R_m=NULL,
                           use_real_occurrences=FALSE,length_diff=Inf,worker_number=NULL){
-  # Find occurrences of the candidate motifs in the curves and sort them according to their frequencies and radius.
-  # In each group (as defined by cutting the dendrogram at high 2*Rall), we choose the motif 
-  # with highest frequency and lower mean dissimilarity (the one ranking best in both dimensions). 
-  # Additional motifs can be chosen in a group, if their lengths differ enough from the length of the first motif chosen.
-  # A candidate motif matches a piece of curve if their dissimilarity is less than the corresponding R_m.
-  # cluster_candidate_motifs_results: output of cluster_candidate_motifs function.
-  # R_all: global radius, used to cut the dendrogram (requiring groups to be more than 2*Rall apart).
-  # R_m: vector with group-specific radii, used to find motif occurrences. The length of the vector must match the number of clusters
-  #      obtained cutting the dendrogram at height 2*Rall. If NULL, Rm is determined in each group (based on distances between motifs of the same group and all curves).
-  # use_real_occurrences: if TRUE, find occurrences for all candidate motifs and uses real frequency and mean dissimilarity to choose motifs 
-  #                       in groups (more accurate, but time consuming). Otherwise, uses approximate frequency and mean dissimilarity (default).
-  # length_diff: minimum difference in length among motifs of the same group, required in ordered to keep more than one motif, in % of the most frequent motif.
-  # worker_number: number of CPU cores to be used for parallelization (default number of CPU cores). If worker_number=1, the function is run sequentially. 
-  
+ 
   ### set parallel jobs ###################################################################################
   core_number <- parallel::detectCores()
   # check worker number

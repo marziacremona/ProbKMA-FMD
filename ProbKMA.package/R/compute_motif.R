@@ -1,10 +1,15 @@
-
+#' @title .compute_motif
+#'
+#' @description Compute the new motif v_new.
+#'
+#' @param v_dom TRUE for x in supp(v).
+#' @param s_k shift vector for motif k.
+#' @param p_k membership vector for motif k.
+#' @param Y list of N lists of two elements, Y0=y_i(x), Y1=y'_i(x), matrices with d columns, for d-dimensional curves.
+#' @return The new motif v_new
+#' @author Marzia Angela Cremona  & Francesca Chiaromonte
+#' @export
 compute_motif <- function(v_dom,s_k,p_k,Y,m,use0,use1){
-  # Compute the new motif v_new.
-  # v_dom: TRUE for x in supp(v).
-  # s_k: shift vector for motif k.
-  # p_k: membership vector for motif k.
-  # Y: list of N lists of two elements, Y0=y_i(x), Y1=y'_i(x), matrices with d columns, for d-dimensional curves.
   
   .compute_v_new <- function(Y_inters_k,Y_inters_supp,v_dom,v_len,p_k,d,m){
     v_new=matrix(NA,nrow=v_len,ncol=d)

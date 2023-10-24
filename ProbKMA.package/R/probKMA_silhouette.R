@@ -1,10 +1,20 @@
-
+#' @title probKMA_silhouette
+#'
+#' @description Compute the adapted silhouette index on the results of probKMA.
+#'
+#' @param probKMA_results output of probKMA function (with return_options=TRUE).
+#' @param align if TRUE, try all possible alignements between pieces of curves (corresponding to the
+#' same or to different motifs).
+#' @param plot if TRUE, the silhouette plot is drawn.
+#' @return A list containing:
+#' @return \item{silhouette}{ vector of silhouette indices}
+#' @return \item{motifs}{ vector of motifs numbers}
+#' @return \item{curves}{ vector of curves numbers with motifs}
+#' @return \item{silhouette_average}{ vector of average silhouette index for each cluster}
+#' @author Marzia Angela Cremona  & Francesca Chiaromonte
+#' @export
 probKMA_silhouette <- function(probKMA_results,align=FALSE,plot=TRUE){
-  # Compute the adapted silhouette index on the results of probKMA.
-  # probKMA_results: output of probKMA function (with return_options=TRUE).
-  # align: if TRUE, try all possible alignements between pieces of curves (corresponding to the same or to different motifs).
-  # plot: if TRUE, the silhouette plot is drawn.
- 
+  
   result <- .probKMA_silhouette_rcpp(probKMA_results,
                                      domain,select_domain,
                                      diss_d0_d1_L2,align) 
