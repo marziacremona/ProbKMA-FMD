@@ -445,7 +445,6 @@ probKMA <- function(Y0,Y1=NULL,standardize=FALSE,K,c,c_max=Inf,P0=NULL,S0=NULL,
     start=proc.time()
     c_k=floor(unlist(lapply(V_new,function(v_new) unlist(lapply(v_new,nrow))[1]))*(1-max_gap))
     c_k[c_k<c]=c
-    c_k=rep(c_k,each=length(Y))
     SD <- .find_shift_warp_min(Y,V_new,w,c_k,K,d,max_gap,
                                alpha,use0,use1,
                                domain,
