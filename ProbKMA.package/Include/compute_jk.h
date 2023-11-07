@@ -3,6 +3,7 @@
 #include "RcppArmadillo.h"
 #include <ranges>
 #include <algorithm>
+#include <omp.h>
 double compute_Jk_rcpp(const Rcpp::List & v,
                        const arma::ivec & s_k,
                        const arma::vec & p_k,

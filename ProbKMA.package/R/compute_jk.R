@@ -1,4 +1,4 @@
-#' @title .compute_Jk
+#' @title compute_Jk
 #'
 #' @description Compute the objective function J for the motif k.
 #'
@@ -20,7 +20,7 @@ compute_jk <- function(v,s_k, p_k,Y,
                        c_k = NULL,
                        keep_k = NULL)
 {
-  out<-.compute_Jk_rcpp(v,s_k,p_k,Y,alpha,w,m,
+  out<- .compute_Jk_rcpp(v,s_k,p_k,Y,alpha,w,m,
                         use0,use1,domain,select_domain,
-                        diss_d0_d1_L2,c_k)
+                        diss_d0_d1_L2,c_k,keep_k)
 }

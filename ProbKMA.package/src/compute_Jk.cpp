@@ -52,12 +52,11 @@ double compute_Jk_rcpp(const Rcpp::List & v,
     
     Rcpp::List y_i = Y[i];
     
-    // length of the curve 
-    const int y_len = Rcpp::as<arma::mat>(y_i[0]).n_rows;
-    
     arma::mat new_y0(index_size + std::max(0, 1-s_k_i), d);
     
     if (use0){
+      // length of the curve 
+      const int y_len = Rcpp::as<arma::mat>(y_i[0]).n_rows;
       arma::mat temp_y0_i = Rcpp::as<arma::mat>(y_i[0]);
       new_y0.fill(arma::datum::nan);
       for(unsigned int j = 0; j < index_size; ++j) {
@@ -72,6 +71,8 @@ double compute_Jk_rcpp(const Rcpp::List & v,
     arma::mat new_y1(index_size + std::max(0, 1-s_k_i), d);
     
     if (use1){
+      // length of the curve 
+      const int y_len = Rcpp::as<arma::mat>(y_i[1]).n_rows;
       arma::mat temp_y1_i = Rcpp::as<arma::mat>(y_i[1]);
       new_y1.fill(arma::datum::nan);
       for(unsigned int j = 0; j < index_size; ++j) {
