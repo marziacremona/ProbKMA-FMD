@@ -187,7 +187,7 @@ Rcpp::List probKMA_silhouette_rcpp(const Rcpp::List & probKMA_results,
      
      bool equal_length_i = equal_length(i);
      
-     Rcpp::NumericVector min_diss_aligned = find_diss_aligned_rcpp(Y_in_motifs[indeces_YY(0,i)],    
+     arma::vec min_diss_aligned = find_diss_aligned_rcpp(Y_in_motifs[indeces_YY(0,i)],    
                                                                    Y_in_motifs[indeces_YY(1,i)],
                                                                    w,
                                                                    alpha,
@@ -199,26 +199,26 @@ Rcpp::List probKMA_silhouette_rcpp(const Rcpp::List & probKMA_results,
                                                                    select_domain,
                                                                    diss_d0_d1_L2); 
                                                              
-     SD(i) = min_diss_aligned[1];
+     SD(i) = min_diss_aligned(1);
   }
  }else{ 
    arma::imat c_Y_motifs_comb = util::combn2<arma::sword>(c_Y_motifs);  
    for(int i = 0; i < YY_length_size; ++i){
      const unsigned int cc_motifs_i = std::min(c_Y_motifs_comb(0,i),
                                                c_Y_motifs_comb(1,i));
-     Rcpp::NumericVector min_diss = find_diss(Y_in_motifs[indeces_YY(0,i)],    
-                                              Y_in_motifs[indeces_YY(1,i)],
-                                              w,
-                                              alpha,
-                                              cc_motifs_i,
-                                              d,
-                                              use0,
-                                              use1,
-                                              domain,
-                                              select_domain,
-                                              diss_d0_d1_L2);
+     arma::vec min_diss = find_diss(Y_in_motifs[indeces_YY(0,i)],    
+                                    Y_in_motifs[indeces_YY(1,i)],
+                                    w,
+                                    alpha,
+                                    cc_motifs_i,
+                                    d,
+                                    use0,
+                                    use1,
+                                    domain,
+                                    select_domain,
+                                    diss_d0_d1_L2);
      
-     SD(i) = min_diss[1];
+     SD(i) = min_diss(1);
    }
   
  }

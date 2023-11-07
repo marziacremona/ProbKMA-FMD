@@ -1,6 +1,7 @@
 #include "elongate_motifs.h"
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::plugins(cpp20)]]
+// [[Rcpp::plugins(openmp)]]
 
 
 void elongation_rcpp(Rcpp::List & V_new, 
@@ -48,6 +49,7 @@ void elongation_rcpp(Rcpp::List & V_new,
   std::vector<arma::ivec> len_elong_k_right_list(len_elong_k_zero_size);
   const int max_len_elong_k = len_elong_k.back();
   unsigned int v_dom_elong_size = 0;
+  //#pragma omp parallel for
   for (unsigned int i = 0; i < len_elong_k_zero_size; ++i) {
     len_elong_k_right_list[i] = len_elong_k_zero.elem(find(len_elong_k_zero <=  max_len_elong_k - len_elong_k_zero(i)));
     v_dom_elong_size += len_elong_k_right_list[i].size();

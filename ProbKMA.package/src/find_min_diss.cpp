@@ -6,20 +6,20 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::plugins(cpp20)]]
 // [[Rcpp::export(.find_diss)]]
- Rcpp::NumericVector find_diss(const Rcpp::List &y,const Rcpp::List &v,  
-                          const arma::vec & w, 
-                          double alpha, unsigned int c_k,
-                          unsigned int d,bool use0,bool use1,
-                          const Rcpp::Function & domain, 
-                          const Rcpp::Function & select_domain,
-                          const Rcpp::Function & diss_d0_d1_L2)
+arma::vec find_diss(const Rcpp::List &y,const Rcpp::List &v,  
+                    const arma::vec & w, 
+                    double alpha, unsigned int c_k,
+                    unsigned int d,bool use0,bool use1,
+                    const Rcpp::Function & domain, 
+                    const Rcpp::Function & select_domain,
+                    const Rcpp::Function & diss_d0_d1_L2)
   {
     // Convert domain and select_domain
     Rcpp::LogicalVector v_dom = Rcpp::as<Rcpp::LogicalVector>(domain(v,use0));
     Rcpp::List v_new = select_domain(v, v_dom, use0, use1);
     int v_len = v_dom.size();
     int y_len = Rcpp::as<arma::mat>(y[0]).n_rows;
-    Rcpp::IntegerVector s_rep = util::myseq(1 - (v_len - c_k), y_len - v_len + 1 + (v_len - c_k));
+    arma::ivec s_rep = arma::regspace<arma::ivec>(1 - (v_len - c_k), y_len - v_len + 1 + (v_len - c_k));
     std::size_t s_rep_size = s_rep.size();
     Rcpp::List y_rep(s_rep_size);
     
@@ -35,7 +35,7 @@
     auto index_range = std::views::iota(0,index_size);
     
     for (unsigned int i = 0; i < s_rep_size; ++i) {
-      Rcpp::IntegerVector index = s_rep[i] - 1 + Rcpp::seq_len(v_len);
+      arma::ivec index = s_rep(i) - 1 + arma::regspace<arma::ivec>(1,v_len);
       Rcpp::List y_rep_i = Rcpp::List::create(Rcpp::Named("y0") = R_NilValue, Rcpp::Named("y1") = R_NilValue);
       auto j_true = index_range
       | std::views::filter([&index,&y_len](int j){return((index[j] > 0) && (index[j] <= y_len));});
@@ -55,27 +55,27 @@
       y_rep[i] = y_rep_i;
     }
     const unsigned int y_rep_size = y_rep.size();
-    Rcpp::IntegerVector length_inter(y_rep_size);
+    arma::ivec length_inter(y_rep_size);
     
     arma::mat temp_y;
     int i = 0;
-    for (const Rcpp::List& y_rep_i : y_rep) { // @TODO: risolvere warning
+    for (unsigned int i = 0; i < y_rep_size; ++i){
+      const Rcpp::List & y_rep_i = y_rep[i];
       if (use0) 
         temp_y = Rcpp::as<arma::mat>(y_rep_i["y0"]);
       else
         temp_y = Rcpp::as<arma::mat>(y_rep_i["y1"]);
       arma::uvec non_na_indices = find_nan(temp_y.col(0)); 
-      length_inter[i] = temp_y.col(0).n_elem - non_na_indices.n_elem;
-      ++i;
+      length_inter(i) = temp_y.col(0).n_elem - non_na_indices.n_elem;
     }
     
-    Rcpp::LogicalVector valid = length_inter >= c_k;
-    if (sum(valid) == 0) {        
-      valid[length_inter == max(length_inter)] = true; 
+    arma::uvec valid = length_inter >= c_k;
+    if (arma::accu(valid) == 0) {        
+      valid.elem(arma::find(length_inter == arma::max(length_inter)))+= 1;  
     }
     
-    s_rep = s_rep[valid];
-    y_rep = y_rep[valid];
+    s_rep = s_rep.elem(find(valid==1));
+    y_rep = y_rep[Rcpp::as<Rcpp::LogicalVector>(Rcpp::wrap(valid))];
     
     const unsigned int y_rep_size_valid = y_rep.size(); 
     
@@ -89,31 +89,31 @@
         min_s = s_rep[i];
       }
     }
-    return Rcpp::NumericVector::create(min_s, min_d); 
+    return arma::vec({min_s, min_d});  
   }
   
   // [[Rcpp::export(.find_diss_aligned_rcpp)]]
-  Rcpp::NumericVector find_diss_aligned_rcpp(const Rcpp::List &y,
-                                             const Rcpp::List &v,  
-                                             const arma::vec & w, 
-                                             double alpha,
-                                             bool aligned,
-                                             unsigned int d,
-                                             bool use0,
-                                             bool use1,
-                                             const Rcpp::Function & domain,
-                                             const Rcpp::Function & select_domain,
-                                             const Rcpp::Function & diss_d0_d1_L2)
+  arma::vec find_diss_aligned_rcpp(const Rcpp::List &y,
+                                   const Rcpp::List &v,  
+                                   const arma::vec & w, 
+                                   double alpha,
+                                   bool aligned,
+                                   unsigned int d,
+                                   bool use0,
+                                   bool use1,
+                                   const Rcpp::Function & domain,
+                                   const Rcpp::Function & select_domain,
+                                   const Rcpp::Function & diss_d0_d1_L2)
   {
     Rcpp::LogicalVector v_dom = Rcpp::as<Rcpp::LogicalVector>(domain(v,use0));
     Rcpp::List v_new = select_domain(v, v_dom, use0, use1);
     int v_len = v_dom.size();
     int y_len = Rcpp::as<arma::mat>(y[0]).n_rows;
-    Rcpp::IntegerVector s_rep;
+    arma::ivec s_rep;
     if (aligned){
       s_rep = 1;
     } else {
-      s_rep = util::myseq(1, y_len - v_len + 1);
+      s_rep = arma::regspace<arma::ivec>(1, y_len - v_len + 1);
     }
     std::size_t s_rep_size = s_rep.size();
     Rcpp::List y_rep(s_rep_size);
@@ -131,7 +131,7 @@
     auto index_range = std::views::iota(0,index_size);
     
     for (unsigned int i = 0; i < s_rep_size; ++i) {
-      Rcpp::IntegerVector index = s_rep[i] - 1 + util::myseq(1,v_len);
+      arma::ivec index = s_rep(i) - 1 + arma::regspace<arma::ivec>(1,v_len);
       Rcpp::List y_rep_i = Rcpp::List::create(Rcpp::Named("y0") = R_NilValue, Rcpp::Named("y1") = R_NilValue);
       auto j_true = index_range
       | std::views::filter([&index,&y_len](int j){return((index[j] > 0) && (index[j] <= y_len));});
@@ -158,10 +158,10 @@
       double dist = Rcpp::as<double>(diss_d0_d1_L2(y_rep[i], v_new, w, alpha));
       if (dist < min_d){
         min_d = dist;
-        min_s = s_rep[i];
+        min_s = s_rep(i);
       }
     }
-    return Rcpp::NumericVector::create(min_s, min_d); 
+    return arma::vec({min_s,min_d});
   }
 
 // [[Rcpp::export(.find_shift_warp_min)]]
@@ -182,15 +182,15 @@ Rcpp::List find_shift_warp_min(const Rcpp::List & Y, // @TODO: void function
   
   const unsigned int Y_size = Y.size();
   const unsigned int V_new_size = V_new.size();
-  Rcpp::NumericVector sd(2);
+  arma::vec sd(2);
   arma::imat S_new(Y_size,V_new_size);
   arma::mat  D_new(Y_size,V_new_size);
   for (unsigned int i = 0; i < V_new_size; ++i) // @TODO: parallelize
     for (unsigned int j = 0; j < Y_size; ++j){ 
       sd = find_diss(Y[j],V_new[i],w,alpha,c_k(i),d,use0,use1,domain,select_domain,diss_d0_d1_L2); // @TODO: modify output to a vec 
-      S_new(j,i) = sd[0];
-      D_new(j,i) = sd[1];
+      S_new(j,i) = sd(0);
+      D_new(j,i) = sd(1);
     }
-    return Rcpp::List::create(S_new,D_new);
+  return Rcpp::List::create(S_new,D_new);
 }
 

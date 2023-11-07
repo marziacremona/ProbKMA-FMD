@@ -67,7 +67,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // find_diss
-Rcpp::NumericVector find_diss(const Rcpp::List& y, const Rcpp::List& v, const arma::vec& w, double alpha, unsigned int c_k, unsigned int d, bool use0, bool use1, const Rcpp::Function& domain, const Rcpp::Function& select_domain, const Rcpp::Function& diss_d0_d1_L2);
+arma::vec find_diss(const Rcpp::List& y, const Rcpp::List& v, const arma::vec& w, double alpha, unsigned int c_k, unsigned int d, bool use0, bool use1, const Rcpp::Function& domain, const Rcpp::Function& select_domain, const Rcpp::Function& diss_d0_d1_L2);
 RcppExport SEXP _ProbKMA_package_find_diss(SEXP ySEXP, SEXP vSEXP, SEXP wSEXP, SEXP alphaSEXP, SEXP c_kSEXP, SEXP dSEXP, SEXP use0SEXP, SEXP use1SEXP, SEXP domainSEXP, SEXP select_domainSEXP, SEXP diss_d0_d1_L2SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -88,7 +88,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // find_diss_aligned_rcpp
-Rcpp::NumericVector find_diss_aligned_rcpp(const Rcpp::List& y, const Rcpp::List& v, const arma::vec& w, double alpha, bool aligned, unsigned int d, bool use0, bool use1, const Rcpp::Function& domain, const Rcpp::Function& select_domain, const Rcpp::Function& diss_d0_d1_L2);
+arma::vec find_diss_aligned_rcpp(const Rcpp::List& y, const Rcpp::List& v, const arma::vec& w, double alpha, bool aligned, unsigned int d, bool use0, bool use1, const Rcpp::Function& domain, const Rcpp::Function& select_domain, const Rcpp::Function& diss_d0_d1_L2);
 RcppExport SEXP _ProbKMA_package_find_diss_aligned_rcpp(SEXP ySEXP, SEXP vSEXP, SEXP wSEXP, SEXP alphaSEXP, SEXP alignedSEXP, SEXP dSEXP, SEXP use0SEXP, SEXP use1SEXP, SEXP domainSEXP, SEXP select_domainSEXP, SEXP diss_d0_d1_L2SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;

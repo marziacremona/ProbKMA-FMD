@@ -3,6 +3,7 @@
 #include "RcppArmadillo.h"
 #include <ranges>
 #include <algorithm>
+#include <omp.h>
 #include "utilities.h"
 #include "compute_jk.h"
 
